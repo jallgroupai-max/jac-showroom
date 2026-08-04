@@ -1,0 +1,301 @@
+"use client";
+
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import type { Scene, ViewMode } from "@/lib/types";
+import { CATEGORIES, DEFAULT_VEHICLE_SLUG, SCENES, getVehicleBySlug, getVehiclesByCategory } from "@/lib/mock-data";
+import { spriteCacheKey } from "@/lib/sprite-cache";
+import { useFullscreen } from "@/hooks/use-fullscreen";
+import { LoadingScreen } from "./loading-screen";
+import { Header } from "./header";
+import { SpriteViewer } from "./sprite-viewer";
+import { CatalogPanel } from "./catalog-panel";
+import { VisualizerControls } from "./visualizer-controls";
+import { PointsOfInterest } from "./points-of-interest";
+import { SpecsPanel } from "./specs-panel";
+import { LeadForm } from "./lead-form";
+import { LeadConfirmation } from "./lead-confirmation";
+
+type SubPhase = "catalog" | "visualizer";
+
+interface ShowroomAppProps {
+  initialVehicleSlug?: string;
+}
+
+// Corte "desktop" — mismo breakpoint que el `lg` de Tailwind (1024px),
+// usado tanto acá (JS) como en las clases responsive del JSX de abajo.
+const DESKTOP_QUERY = "(min-width: 1024px)";
+
+function subscribeToDesktopQuery(callback: () => void): () => void {
+  const mql = window.matchMedia(DESKTOP_QUERY);
+  mql.addEventListener("change", callback);
+  return () => mql.removeEventListener("change", callback);
+}
+
+function getDesktopSnapshot(): boolean {
+  return window.matchMedia(DESKTOP_QUERY).matches;
+}
+
+/**
+ * Orquestador principal — máquina de estados del showroom.
+ * Ver docs/APP-FLOW.md para el diagrama completo de flujo.
+ *
+ * Desktop (≥1024px, no negociable):
+ * - El body (fondo + vehículo) ocupa siempre 100% del alto disponible
+ *   (100dvh - header) — los controles flotan ENCIMA, no le restan espacio.
+ * - La vista arranca directo mostrando el vehículo por defecto con sus
+ *   controles ya visibles (modo "visualizador"), sin pasar primero por el
+ *   selector de catálogo.
+ *
+ * Mobile/tablet (<1024px, no negociable — diseño distinto al de desktop):
+ * - El héroe es una franja compacta de alto fijo (no `flex-1`/100vh) — la
+ *   página completa hace scroll normal debajo de él, no todo encaja en un
+ *   `h-dvh overflow-hidden` como en desktop.
+ * - Arranca en el selector de catálogo (sin cambios).
+ * - Sin pod de girar/zoom, sin botones en el header (ni pantalla completa
+ *   ni "Me Interesa") ni toolbar de POI — el CTA "Me Interesa" vive en una
+ *   barra nueva en flujo normal, debajo del catálogo/controles (NO fija ni
+ *   flotante), y el header solo muestra logo + título.
+ */
+export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
+  const startVehicle = getVehicleBySlug(initialVehicleSlug ?? "") ?? getVehicleBySlug(DEFAULT_VEHICLE_SLUG)!;
+
+  const [phase, setPhase] = useState<"loading" | "app">("loading");
+  // subPhase explícito: null hasta que el usuario interactúa (cambia de
+  // vehículo, abre el catálogo, etc.) — mientras sea null, la vista
+  // efectiva se deriva de isDesktop (ver más abajo). Una vez que el
+  // usuario interactúa, su elección manda y ya no depende del viewport.
+  const [subPhaseOverride, setSubPhaseOverride] = useState<SubPhase | null>(null);
+  const [activeCategorySlug, setActiveCategorySlug] = useState(startVehicle.categorySlug);
+  const [activeVehicleSlug, setActiveVehicleSlug] = useState(startVehicle.slug);
+  const [activeVariantId, setActiveVariantId] = useState(startVehicle.variants[0].id);
+  const [viewMode, setViewMode] = useState<ViewMode>("exterior");
+  const [sceneId, setSceneId] = useState<Scene["id"]>("own");
+  const [specsOpen, setSpecsOpen] = useState(false);
+  const [leadFormOpen, setLeadFormOpen] = useState(false);
+  const [leadConfirmationOpen, setLeadConfirmationOpen] = useState(false);
+
+  // Sincronización con matchMedia vía useSyncExternalStore (patrón
+  // recomendado por React para esto — sin efecto, sin setState-in-effect).
+  // getServerSnapshot devuelve false para que SSR/primer render de
+  // hidratación coincidan; React ya se encarga de re-renderizar con el
+  // valor real del cliente apenas hidrata, sin parpadeo visible porque
+  // esto corre durante la fase "loading" (antes de que se vea el body).
+  const isDesktop = useSyncExternalStore(subscribeToDesktopQuery, getDesktopSnapshot, () => false);
+  const subPhase: SubPhase = subPhaseOverride ?? (isDesktop ? "visualizer" : "catalog");
+  const setSubPhase = setSubPhaseOverride;
+
+  // "Pantalla completa" simulada dentro de la propia página (no la
+  // Fullscreen API nativa) — el Header es siempre `fixed` (ver header.tsx),
+  // así el cambio de modo nunca salta de `position` (eso no se anima). Lo
+  // que sí anima, con Framer Motion, es el alto que le reserva el wrapper
+  // de abajo: headerHeight normal, 0 en pantalla completa — el héroe crece
+  // detrás del header (que se vuelve transparente) en vez de saltar.
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const update = () => setHeaderHeight(header.offsetHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+    // `phase` es dependencia a propósito: mientras `phase === "loading"` el
+    // Header ni siquiera está montado (return anticipado más abajo), así
+    // que el efecto debe re-correr cuando pasa a "app" y headerRef ya
+    // apunta al nodo real. `useLayoutEffect` (no `useEffect`) para medir
+    // antes del primer paint y que el spacer nunca arranque en 0 con flash.
+  }, [phase]);
+
+  const vehicle = getVehicleBySlug(activeVehicleSlug) ?? startVehicle;
+  const variant = vehicle.variants.find((v) => v.id === activeVariantId) ?? vehicle.variants[0];
+  const vehiclesInCategory = useMemo(() => getVehiclesByCategory(activeCategorySlug), [activeCategorySlug]);
+
+  const spriteSets = viewMode === "exterior" ? variant.exteriorSprites : vehicle.interior.sprites;
+  const cacheKey = spriteCacheKey(vehicle.slug, viewMode === "exterior" ? activeVariantId : "interior");
+  const activeScene = sceneId === "own" ? undefined : SCENES.find((s) => s.id === sceneId);
+  const backgroundColor = activeScene?.color;
+  const backgroundUrl = backgroundColor ? undefined : (activeScene?.imageUrl ?? vehicle.ownBackgroundUrl);
+
+  function selectVehicle(slug: string) {
+    const next = getVehicleBySlug(slug);
+    if (!next) return;
+    setActiveVehicleSlug(slug);
+    setActiveVariantId(next.variants[0].id);
+    // El modo Exterior/Interior PERSISTE al cambiar de vehículo (confirmado
+    // en conversación) — no se resetea acá.
+    setSubPhase("visualizer");
+  }
+
+  function changeCategory(slug: string) {
+    setActiveCategorySlug(slug);
+  }
+
+  if (phase === "loading") {
+    return (
+      <LoadingScreen
+        cacheKey={spriteCacheKey(startVehicle.slug, startVehicle.variants[0].id)}
+        spriteSets={startVehicle.variants[0].exteriorSprites}
+        onReady={() => setPhase("app")}
+      />
+    );
+  }
+
+  return (
+    <div className="relative flex min-h-dvh flex-col bg-[#F4F6F9] lg:h-dvh lg:overflow-hidden">
+      <motion.div
+        className="shrink-0"
+        initial={false}
+        animate={{ height: isFullscreen ? 0 : headerHeight }}
+        transition={{ duration: 0.35, ease: "easeInOut" }}
+      >
+        <Header
+          ref={headerRef}
+          title={`${vehicle.commercialName} ${vehicle.trimLabel}`}
+          onMeInteresa={() => setLeadFormOpen(true)}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+        />
+      </motion.div>
+
+      {/* Body/héroe — franja compacta de alto fijo en mobile/tablet (la
+          página hace scroll debajo); siempre flex-1 (100dvh - header) desde
+          desktop, donde los controles de abajo salen del flujo
+          (lg:absolute) y el héroe reclama todo el espacio libre. */}
+      <div className="relative h-[38vh] shrink-0 overflow-hidden lg:h-auto lg:flex-1">
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.div
+            key={vehicle.slug}
+            className="absolute inset-0"
+            initial={{ x: "100%", opacity: 0.4 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: "-100%", opacity: 0.4 }}
+            transition={{ type: "tween", duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <SpriteViewer
+              cacheKey={cacheKey}
+              spriteSets={spriteSets}
+              backgroundUrl={backgroundUrl}
+              backgroundColor={backgroundColor}
+              isFullscreen={isFullscreen}
+              showControls={subPhase === "visualizer"}
+            />
+          </motion.div>
+        </AnimatePresence>
+
+        {subPhase === "visualizer" && (
+          <button
+            type="button"
+            onClick={() => setSpecsOpen(true)}
+            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-l-xl bg-[#111318] px-4 py-2 text-[10px] font-bold tracking-widest text-white [writing-mode:vertical-rl]"
+          >
+            « ESPEC
+          </button>
+        )}
+      </div>
+
+      {/* Hint de rotación — en mobile/tablet vive suelto, centrado, justo
+          debajo del héroe (visible tanto en catálogo como en visualizador);
+          en desktop sigue agrupado con el toolbar de POI, más abajo. */}
+      <div className="flex shrink-0 justify-center px-4 pt-3 mb-2 lg:hidden">
+        <div className="pointer-events-none rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm">
+          Haz clic y arrastra para rotar{" "}
+          <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
+        </div>
+      </div>
+
+      {/* Controles: fila normal debajo del héroe en mobile/tablet;
+          overlay absoluto flotando sobre el héroe desde desktop (lg:). */}
+      <div className="relative z-10 shrink-0 px-4 pb-3 sm:px-6 mx-auto lg:absolute lg:inset-x-0 lg:bottom-0 lg:shrink lg:pb-6 max-w-6xl w-full">
+        <AnimatePresence mode="wait" initial={false}>
+          {subPhase === "catalog" ? (
+            <motion.div
+              key="catalog"
+              initial={{ y: "60%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "60%", opacity: 0 }}
+              transition={{ duration: 0.45, ease: "easeInOut" }}
+              className="h-auto rounded-3xl bg-white/70 backdrop-blur lg:h-75"
+            >
+              <CatalogPanel
+                categories={CATEGORIES}
+                activeCategorySlug={activeCategorySlug}
+                onCategoryChange={changeCategory}
+                vehicles={vehiclesInCategory}
+                activeVehicleSlug={activeVehicleSlug}
+                onSelectVehicle={selectVehicle}
+                onClose={() => setSubPhase("visualizer")}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="visualizer-controls"
+              initial={{ y: "60%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "60%", opacity: 0 }}
+              transition={{ duration: 0.45, ease: "easeInOut" }}
+              className="flex flex-col gap-3"
+            >
+              <div className="hidden items-center justify-between gap-3 lg:flex">
+                <PointsOfInterest points={vehicle.pointsOfInterest} mode={viewMode} />
+                <div className="flex flex-1 justify-end">
+                  <div className="pointer-events-none rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm">
+                    Haz clic y arrastra para rotar{" "}
+                    <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
+                  </div>
+                </div>
+              </div>
+              <VisualizerControls
+                vehicle={vehicle}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                activeVariantId={activeVariantId}
+                onVariantChange={setActiveVariantId}
+                scenes={SCENES}
+                activeSceneId={sceneId}
+                onSceneChange={setSceneId}
+                onChangeVehicle={() => setSubPhase("catalog")}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* CTA persistente — en mobile/tablet vive en su propia barra, en
+          flujo normal, justo debajo del contenedor de catálogo/controles
+          (docs/UX-UI-BRIEF.md §7); en desktop sigue en el header. */}
+      <div className="relative shrink-0 border-t border-black/5 bg-white p-3 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setLeadFormOpen(true)}
+          className="w-full rounded-full bg-[#111318] py-3.5 text-sm font-semibold text-white transition-transform active:scale-95"
+        >
+          Me Interesa
+        </button>
+      </div>
+
+      <SpecsPanel vehicle={vehicle} open={specsOpen} onOpenChange={setSpecsOpen} />
+
+      <LeadForm
+        vehicle={vehicle}
+        variant={variant}
+        open={leadFormOpen}
+        onOpenChange={setLeadFormOpen}
+        onSuccess={() => {
+          setLeadFormOpen(false);
+          setLeadConfirmationOpen(true);
+        }}
+      />
+
+      <LeadConfirmation
+        vehicle={vehicle}
+        variant={variant}
+        open={leadConfirmationOpen}
+        onOpenChange={setLeadConfirmationOpen}
+      />
+    </div>
+  );
+}
