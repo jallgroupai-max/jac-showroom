@@ -1,0 +1,18 @@
+# Despliegue del showroom 360° — `docker compose up -d --build`.
+# El puerto publicado se puede cambiar sin editar el archivo:
+#   PORT=8080 docker compose up -d   (por defecto 3000)
+services:
+  showroom:
+    build: .
+    image: jac-showroom:latest
+    container_name: jac-showroom
+    ports:
+      - "${PORT:-3000}:3000"
+    restart: unless-stopped
+    # wget de busybox (viene en alpine — la imagen no trae curl).
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
