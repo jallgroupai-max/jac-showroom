@@ -167,7 +167,11 @@ export function SpriteViewer({
         {/* Cambio de VEHÍCULO = crossfade: la capa del vehículo saliente
             (congelada en su último frame) se desvanece mientras la del nuevo
             aparece — el fondo de escena NO participa del fade, solo el
-            vehículo (o la silueta de "no disponible"). */}
+            vehículo (o la silueta de "no disponible").
+            bottom-[10%]: el vehículo se apoya en una "línea de piso" un 10%
+            por encima del borde inferior del héroe, para que no quede pegado
+            a los controles flotantes de abajo (va a la par del object-bottom
+            del fondo en scene-background.tsx). */}
         <AnimatePresence initial={false}>
           <motion.div
             key={vehicleKey ?? "vehicle"}
@@ -175,10 +179,10 @@ export function SpriteViewer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="absolute inset-0 flex items-end justify-center"
+            className="absolute inset-x-0 top-0 bottom-[10%] flex items-end justify-center"
           >
           {unavailable ? (
-            <div className="relative flex h-[85%] max-w-[90%] translate-y-[6%] items-center justify-center lg:h-[92%] lg:max-w-[82%]">
+            <div className="relative flex h-[95%] max-w-[90%] translate-y-[6%] items-center justify-center lg:h-full lg:max-w-[82%]">
               {/* eslint-disable-next-line @next/next/no-img-element -- silueta compartida servida directo */}
               <img
                 src={UNAVAILABLE_VEHICLE_IMAGE}
@@ -209,7 +213,7 @@ export function SpriteViewer({
                   onAnimationComplete={() => {
                     if (wipe.phase === "fade") setWipe(null);
                   }}
-                  className="pointer-events-none h-[85%] max-w-[90%] object-contain drop-shadow-2xl lg:h-[92%] lg:max-w-[82%]"
+                  className="pointer-events-none h-[95%] max-w-[90%] object-contain drop-shadow-2xl lg:h-full lg:max-w-[82%]"
                 />
                 {/* El color nuevo entra con barrido + fade 0 -> 1 sobre la
                     capa saliente: la zona ya barrida se va solidificando
@@ -230,7 +234,7 @@ export function SpriteViewer({
                   onAnimationComplete={() => {
                     if (wipe.phase === "sweep") setWipe((w) => (w ? { ...w, phase: "fade" } : w));
                   }}
-                  className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-[85%] max-w-[90%] object-contain drop-shadow-2xl lg:h-[92%] lg:max-w-[82%]"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-[95%] max-w-[90%] object-contain drop-shadow-2xl lg:h-full lg:max-w-[82%]"
                 />
               </>
             ) : (
@@ -240,7 +244,7 @@ export function SpriteViewer({
                 src={frameUrl}
                 alt="Vista del vehículo"
                 draggable={false}
-                className="pointer-events-none h-[85%] max-w-[90%] object-contain drop-shadow-2xl lg:h-[92%] lg:max-w-[82%]"
+                className="pointer-events-none h-[95%] max-w-[90%] object-contain drop-shadow-2xl lg:h-full lg:max-w-[82%]"
               />
             )
           ) : (

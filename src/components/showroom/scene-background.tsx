@@ -38,7 +38,12 @@ export function SceneBackground({ imageUrl, color }: SceneBackgroundProps) {
             src={imageUrl}
             alt=""
             aria-hidden
-            className="absolute inset-0 h-full w-full object-cover"
+            // object-bottom: el recorte de object-cover se ancla al borde
+            // inferior de la foto — la escena "sube" (más piso visible abajo,
+            // pared/logo más arriba) acompañando al vehículo, que se apoya un
+            // 10% por encima del borde inferior (ver sprite-viewer.tsx). Sin
+            // franjas vacías: el cover siempre llena el contenedor.
+            className="absolute inset-0 h-full w-full object-cover object-bottom"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

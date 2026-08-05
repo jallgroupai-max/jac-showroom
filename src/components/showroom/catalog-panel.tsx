@@ -17,20 +17,28 @@ interface CatalogPanelProps {
   onConfirmVehicle: () => void;
 }
 
-// Selección en dos tiempos: primero el resaltado azul del vehículo anterior
-// se desvanece (transition-colors `duration-300` de la tarjeta) y RECIÉN
-// entonces el carrusel se desplaza animado hasta centrar la tarjeta nueva.
+// El loop nativo de Embla solo funciona si el contenido "de respaldo" (todas
+// las tarjetas salvo la que hace de punto de envoltura) alcanza a cubrir el
+// viewport — con pocas tarjetas Embla desactiva el loop en silencio. Se
+// repite el set las veces necesarias para garantizar ese margen.
+const MIN_LOOP_SLIDES = 10;
+
+// Selección en dos tiempos: al clic la previsualización del héroe cambia de
+// inmediato, y tras esta pausa el carrusel se desplaza animado hasta centrar
+// la tarjeta clicada — el resaltado azul viaja junto con el snap (ver
+// centeredIndex), así el crossfade del héroe arranca antes que el scroll.
 const HIGHLIGHT_FADE_MS = 300;
 
 /**
  * "Selecciona tu vehículo" — ver recursos/diseño-ux/Home-1.0.0-*.png.
- * Carrusel Embla arrastrable con dedo o mouse, FINITO (cada vehículo aparece
- * UNA sola vez — arrastrar más allá de los extremos rebota de vuelta), SIN
- * desplazamiento automático ni flechas: solo se mueve cuando el usuario lo
- * arrastra. Abre con el vehículo seleccionado centrado (startIndex + align
- * center). El resaltado azul (#5D95B7, muestreado del mockup) y la apertura
- * del visualizador solo ocurren al hacer clic sobre una tarjeta — Embla ya
- * cancela el clic cuando el gesto fue un arrastre.
+ * Carrusel Embla arrastrable con dedo o mouse, en scroll INFINITO (loop),
+ * SIN desplazamiento automático ni flechas: solo se mueve cuando el usuario
+ * lo arrastra. Abre con el vehículo seleccionado centrado (startIndex + align
+ * center). El resaltado azul (#5D95B7, muestreado del mockup) es POSICIONAL:
+ * solo la tarjeta CENTRADA lo lleva (el resto queda blanca) — con el loop el
+ * set se repite y un resaltado por slug pintaría todas las copias a la vez.
+ * La apertura del visualizador solo ocurre al hacer clic sobre una tarjeta —
+ * Embla ya cancela el clic cuando el gesto fue un arrastre.
  */
 export function CatalogPanel({
   categories,
@@ -42,22 +50,37 @@ export function CatalogPanel({
   onConfirmVehicle,
 }: CatalogPanelProps) {
   const activeIndex = Math.max(0, vehicles.findIndex((v) => v.slug === activeVehicleSlug));
+  const repeatCount = vehicles.length > 1 ? Math.max(2, Math.ceil(MIN_LOOP_SLIDES / vehicles.length)) : 1;
+  const loopVehicles = Array.from({ length: repeatCount }, () => vehicles).flat();
 
   // startIndex capturado UNA sola vez (al montar): si se recalculara con cada
   // selección, embla se reinicializaría y la tarjeta nueva saltaría al centro
   // de golpe — el centrado posterior se hace con scrollTo animado (abajo).
   const [initialIndex] = useState(activeIndex);
 
-  // Sin dragFree: al soltar, Embla ajusta al snap más cercano. Carrusel
-  // FINITO (sin loop — arrastrar más allá de los extremos rebota de vuelta);
-  // containScroll desactivado para que align:center pueda centrar TAMBIÉN la
-  // primera y la última tarjeta — el vehículo seleccionado siempre puede
-  // quedar en el medio, aunque a los costados quede espacio libre.
+  // Sin dragFree: al soltar, Embla ajusta al snap más cercano. Con loop, el
+  // scrollTo de la selección toma el camino más corto hasta la copia clicada.
   const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: true,
     align: "center",
-    containScroll: false,
     startIndex: initialIndex,
   });
+
+  // Índice del slide CENTRADO (snap seleccionado de Embla) — es quien manda
+  // sobre el resaltado azul: se actualiza al clicar (scrollTo), al arrastrar
+  // y al reinicializar, siguiendo siempre a la tarjeta del medio.
+  const [centeredIndex, setCenteredIndex] = useState(initialIndex);
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setCenteredIndex(emblaApi.selectedScrollSnap());
+    onSelect();
+    emblaApi.on("select", onSelect);
+    emblaApi.on("reInit", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+      emblaApi.off("reInit", onSelect);
+    };
+  }, [emblaApi]);
 
   // Cambio de categoría = otro set de tarjetas: salto instantáneo al inicio
   // (es un cambio de contexto, no una selección — sin animación).
@@ -129,13 +152,14 @@ export function CatalogPanel({
             ref={emblaRef}
           >
             <div className="flex h-full items-center gap-3 lg:gap-0">
-              {vehicles.map((v, i) => {
-                const isActive = v.slug === activeVehicleSlug;
+              {loopVehicles.map((v, i) => {
+                // Posicional, no por slug: solo la copia centrada se pinta.
+                const isActive = i === centeredIndex;
                 return (
                   // Slide: ancho fijo en mobile; en desktop 232px (tarjeta
                   // CUADRADA de 220 + 12 de separación interna).
                   <div
-                    key={v.slug}
+                    key={`${v.slug}-${i}`}
                     className="flex min-w-0 shrink-0 grow-0 basis-[190px] sm:basis-[220px] lg:basis-[232px] lg:px-1.5"
                   >
                   <button
