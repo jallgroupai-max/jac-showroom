@@ -4,36 +4,61 @@ import type { Category, PointOfInterest, Quality, Scene, SpecGroup, SpriteSet, V
 // Ver docs/TRD.md §5 y docs/IMPLEMENTATION-PLAN.md §5 ("funcional primero, integrar después").
 
 /**
- * ⚠️ PLACEHOLDER DE ASSETS: todavía no existe un set de fotos 360° por
- * modelo/color — solo tenemos UN prototipo real (recursos/QUALITYS, un sedán
- * rojo) recibido como piloto técnico del pipeline. Mientras no lleguen los
- * sets reales por vehículo (Fase 4 del plan de implementación), los 5
- * vehículos del catálogo comparten este mismo set de sprites como demo
- * funcional del mecanismo de rotación/calidad — el visualizador muestra un
- * aviso visible de "vista previa técnica" cuando esto aplica.
+ * Convención de assets 360°: public/assets/models/{modelo}/{color}/{quality}
+ * con frames 0001..0036.webp. Un vehículo SIN `model` no tiene set 360° —
+ * el visualizador muestra la silueta compartida (/assets/shadow.png) con el
+ * aviso "Vehículo no disponible".
  */
-const DEMO_SPRITE_BASE = "/assets/demo-vehicle/exterior";
+const MODELS_BASE = "/assets/models";
 
-function demoSpriteSets(): SpriteSet[] {
+/** Imagen de silueta compartida para vehículos sin modelo 360°. */
+export const UNAVAILABLE_VEHICLE_IMAGE = "/assets/shadow.png";
+
+/** Carpeta de sprites por color de carrocería con set 360° disponible. */
+const COLOR_SPRITE_SLUGS: Record<string, string> = {
+  Rojo: "rojo",
+  Blanco: "blanco",
+  Negro: "negro",
+  Azul: "azul",
+};
+
+function modelSpriteSets(model: string, colorName: string): SpriteSet[] {
+  const slug = COLOR_SPRITE_SLUGS[colorName] ?? "rojo";
   const qualities: Quality[] = ["low", "medium", "high"];
   return qualities.map((quality) => ({
     quality,
     frameUrl: (frame: number) =>
-      `${DEMO_SPRITE_BASE}/${quality}/${String(frame).padStart(4, "0")}.webp`,
+      `${MODELS_BASE}/${model}/${slug}/${quality}/${String(frame).padStart(4, "0")}.webp`,
   }));
 }
 
-// Thumbnails reales del selector de color — recursos/controlers-colores-car/
-// (Opcion-1..5.png), copiadas a public/assets/colors/. A diferencia del
-// sprite 360° (que sigue siendo placeholder compartido), estas imágenes SÍ
-// son los assets reales entregados para esta pieza específica de UI.
-const COLOR_THUMBNAILS: Record<string, string> = {
-  Rojo: "/assets/colors/rojo.png",
-  Azul: "/assets/colors/azul.png",
-  Blanco: "/assets/colors/blanco.png",
-  Negro: "/assets/colors/negro.png",
-  Gris: "/assets/colors/gris.png",
-};
+// Thumbnail del selector de color: el frame 25 del set LOW del propio color
+// (vista 3/4 del vehículo ya pintado) — así la muestra siempre coincide con
+// el color real del sprite, sin assets aparte que mantener.
+const THUMBNAIL_FRAME = 25;
+
+function colorThumbnailUrl(model: string, colorName: string): string {
+  return modelSpriteSets(model, colorName)[0].frameUrl(THUMBNAIL_FRAME);
+}
+
+// Los 4 colores de carrocería con set 360° real (COLOR_SPRITE_SLUGS) — todo
+// vehículo ofrece exactamente estos, variando solo cuál es el default.
+const BODY_COLORS = {
+  Blanco: "#F2F3F5",
+  Negro: "#1B1C1F",
+  Azul: "#2E5FA3",
+  Rojo: "#C22B2B",
+} as const;
+
+type BodyColorName = keyof typeof BODY_COLORS;
+
+function bodyColors(first: BodyColorName): Array<{ name: string; hex: string }> {
+  const names = Object.keys(BODY_COLORS) as BodyColorName[];
+  return [first, ...names.filter((n) => n !== first)].map((name) => ({
+    name,
+    hex: BODY_COLORS[name],
+  }));
+}
 
 export const HAS_REAL_SPRITES = false;
 
@@ -45,19 +70,9 @@ export const CATEGORIES: Category[] = [
 ];
 
 export const SCENES: Scene[] = [
-  { id: "light", label: "Claro", imageUrl: "/assets/backgrounds/light.png" },
+  { id: "light", label: "Claro", imageUrl: "/assets/backgrounds/light.jpeg" },
   // { id: "own", label: "Propio" }, // usa Vehicle.ownBackgroundUrl
-  { id: "dark", label: "Oscuro", imageUrl: "/assets/backgrounds/dark.jpg" },
-  // Fondos de color sólido — grises claros, un crema suave y dos oscuros
-  // pensados a propósito para la composición/simetría del vehículo, sin
-  // chocar con NINGÚN color de carrocería (incluidos vehículos blancos,
-  // negros o rojos, no solo el rojo de prueba): ninguno usa blanco puro ni
-  // negro puro, así siempre queda un borde de contraste con el silueta.
-  { id: "color-perla", label: "Perla", color: "#F4F6F9" },
-  { id: "color-gris-claro", label: "Gris claro", color: "#DADFE6" },
-  { id: "color-crema", label: "Crema", color: "#EFE7DA" },
-  { id: "color-grafito", label: "Grafito", color: "#33363E" },
-  { id: "color-carbon", label: "Carbón", color: "#17181C" },
+  { id: "dark", label: "Oscuro", imageUrl: "/assets/backgrounds/dark.jpeg" },
 ];
 
 const AVENTURA_4X4_SPECS: SpecGroup[] = [
@@ -96,10 +111,16 @@ function makeVehicle(partial: {
   technicalName: string;
   trimLabel: string;
   typeTag: string;
+  categorySlug: string;
   order: number;
   featureIcons: string[];
   /** Primer color = variante activa por defecto. */
   colors: Array<{ name: string; hex: string }>;
+  /** Carpeta del modelo 360° en /assets/models (ej. "elite"). Sin modelo,
+   * el vehículo NO está disponible en el visualizador: silueta + aviso. */
+  model?: string;
+  /** Imagen propia para la tarjeta del catálogo. */
+  cardImageUrl?: string;
   specGroups?: SpecGroup[];
 }): Vehicle {
   return {
@@ -107,22 +128,35 @@ function makeVehicle(partial: {
     commercialName: partial.commercialName,
     technicalName: partial.technicalName,
     trimLabel: partial.trimLabel,
-    categorySlug: "pickups",
+    categorySlug: partial.categorySlug,
     typeTag: partial.typeTag,
     order: partial.order,
     featureIcons: partial.featureIcons,
-    ownBackgroundUrl: "/assets/backgrounds/light.png",
-    // ⚠️ El sprite 360° sigue siendo el placeholder compartido (ver nota de
-    // arriba) — pero el thumbnail del selector de color SÍ usa el asset
-    // real entregado (recursos/controlers-colores-car).
-    variants: partial.colors.map(({ name, hex }) => ({
-      id: `${partial.slug}-${name.toLowerCase()}`,
-      colorName: name,
-      colorHex: hex,
-      exteriorSprites: demoSpriteSets(),
-      thumbnailUrl: COLOR_THUMBNAILS[name] ?? demoSpriteSets()[1].frameUrl(1),
-    })),
-    interior: { sprites: demoSpriteSets() },
+    cardImageUrl: partial.cardImageUrl,
+    ownBackgroundUrl: "/assets/backgrounds/light.jpeg",
+    // Con `model`, cada variante carga el set 360° de SU color desde
+    // /assets/models/{modelo}/{color}/{quality} y su thumbnail sale del
+    // propio set (frame 25 en low). Sin modelo, una única variante SIN
+    // sprites (exteriorSprites vacío) — el visualizador lo detecta y
+    // muestra la silueta con "Vehículo no disponible".
+    variants: partial.model
+      ? partial.colors.map(({ name, hex }) => ({
+          id: `${partial.slug}-${name.toLowerCase()}`,
+          colorName: name,
+          colorHex: hex,
+          exteriorSprites: modelSpriteSets(partial.model!, name),
+          thumbnailUrl: colorThumbnailUrl(partial.model!, name),
+        }))
+      : [
+          {
+            id: `${partial.slug}-${partial.colors[0].name.toLowerCase()}`,
+            colorName: partial.colors[0].name,
+            colorHex: partial.colors[0].hex,
+            exteriorSprites: [],
+            thumbnailUrl: partial.cardImageUrl ?? UNAVAILABLE_VEHICLE_IMAGE,
+          },
+        ],
+    interior: { sprites: partial.model ? modelSpriteSets(partial.model, "Rojo") : [] },
     specGroups: partial.specGroups ?? [{ title: "ESPECIFICACIONES", items: [] }],
     warrantyLabel: "Garantía de 5 años / 100,000 km",
     pointsOfInterest: [...GENERIC_POI_EXTERIOR, ...GENERIC_POI_INTERIOR],
@@ -130,86 +164,91 @@ function makeVehicle(partial: {
 }
 
 export const VEHICLES: Vehicle[] = [
+  // ——— Sedán ———
   makeVehicle({
-    slug: "venezolana-pro",
-    commercialName: "Venezolana Pro",
-    technicalName: "Venezolana Pro",
-    trimLabel: "4×2",
-    typeTag: "Pickup · 4×2",
+    slug: "elite",
+    commercialName: "ÉLITE",
+    technicalName: "ÉLITE",
+    trimLabel: "Sedán",
+    typeTag: "Sedán · Automático",
+    categorySlug: "sedan",
     order: 0,
-    featureIcons: ["engine"],
-    colors: [
-      { name: "Azul", hex: "#2E5FA3" },
-      { name: "Rojo", hex: "#C22B2B" },
-      { name: "Gris", hex: "#6B7280" },
-    ],
-  }),
-  makeVehicle({
-    slug: "aventura-pro",
-    commercialName: "Aventura Pro",
-    technicalName: "Aventura Pro",
-    trimLabel: "Eléctrico",
-    typeTag: "Pickup · Eléctrico",
-    order: 1,
-    featureIcons: ["connectivity"],
-    colors: [
-      { name: "Rojo", hex: "#C22B2B" },
-      { name: "Azul", hex: "#2E5FA3" },
-      { name: "Negro", hex: "#1B1C1F" },
-    ],
-  }),
-  makeVehicle({
-    slug: "aventura-4x4",
-    commercialName: "Aventura 4X4",
-    technicalName: "Frison T9 4X4",
-    trimLabel: "Gasolina Automática",
-    typeTag: "Pickup · 221 hp",
-    order: 2,
-    featureIcons: ["suspension", "engine"],
-    colors: [
-      { name: "Blanco", hex: "#F2F3F5" },
-      { name: "Rojo", hex: "#C22B2B" },
-      { name: "Azul", hex: "#2E6FB8" },
-      { name: "Gris", hex: "#6B7280" },
-      { name: "Negro", hex: "#1B1C1F" },
-    ],
+    // Tipos de vehículo (electrico/gasolina/gasoil/4x4, combinables) — se
+    // muestran como círculos en la card del catálogo.
+    featureIcons: ["gasoil-car"],
+    colors: bodyColors("Blanco"),
+    // ÉLITE es el único con modelo 360° completo: los 4 sets de color
+    // (blanco/negro/azul/rojo) viven en /assets/models/elite. Su card del
+    // catálogo usa la foto real; las muestras de color salen del sprite.
+    model: "elite",
+    cardImageUrl: "/assets/vehicles/elite.png",
     specGroups: AVENTURA_4X4_SPECS,
   }),
   makeVehicle({
-    slug: "la-venezolana",
-    commercialName: "La Venezolana",
-    technicalName: "La Venezolana",
-    trimLabel: "4×4",
-    typeTag: "Pickup · 4×4",
-    order: 3,
-    featureIcons: ["suspension", "engine"],
-    colors: [
-      { name: "Azul", hex: "#2E6FB8" },
-      { name: "Blanco", hex: "#F2F3F5" },
-      { name: "Negro", hex: "#1B1C1F" },
-    ],
+    slug: "gx7",
+    commercialName: "GX7",
+    technicalName: "GX7",
+    trimLabel: "Sedán",
+    typeTag: "Sedán · Automático",
+    categorySlug: "sedan",
+    order: 1,
+    featureIcons: ["gasoil-car"],
+    colors: [{ name: "Rojo", hex: BODY_COLORS.Rojo }],
+    cardImageUrl: "/assets/vehicles/gx7.png",
   }),
   makeVehicle({
-    slug: "pickup-limited",
-    commercialName: "Pickup Limited",
-    technicalName: "Pickup Limited",
-    trimLabel: "Diésel",
-    typeTag: "Pickup · Diésel",
-    order: 4,
-    featureIcons: ["engine"],
-    colors: [
-      { name: "Negro", hex: "#1B1C1F" },
-      { name: "Gris", hex: "#6B7280" },
-    ],
+    slug: "arena-jac-sport",
+    commercialName: "Arena Jac Sport",
+    technicalName: "Arena Jac Sport",
+    trimLabel: "AT",
+    typeTag: "Sedán · AT",
+    categorySlug: "sedan",
+    order: 2,
+    featureIcons: ["gasoil-car"],
+    colors: [{ name: "Negro", hex: BODY_COLORS.Negro }],
+    cardImageUrl: "/assets/vehicles/arena-jac-sport.png",
+  }),
+  // ——— Pickups ———
+  makeVehicle({
+    slug: "la-venezolana-pro",
+    commercialName: "La Venezolana Pro",
+    technicalName: "La Venezolana Pro",
+    trimLabel: "4×4",
+    typeTag: "Pickup · 4×4",
+    categorySlug: "pickups",
+    order: 0,
+    // Combinación de tipos: 4x4 + diésel.
+    featureIcons: ["4x4-car", "diesel-car"],
+    colors: [{ name: "Azul", hex: BODY_COLORS.Azul }],
+    cardImageUrl: "/assets/vehicles/la-venezolana-pro.png",
+  }),
+  // ——— Comercial ———
+  makeVehicle({
+    slug: "sunray-v6-carga",
+    commercialName: "SUNRAY V6 CARGA",
+    technicalName: "SUNRAY V6 CARGA",
+    trimLabel: "Carga",
+    typeTag: "Comercial · Carga",
+    categorySlug: "comercial",
+    order: 0,
+    featureIcons: ["diesel-car"],
+    colors: [{ name: "Blanco", hex: BODY_COLORS.Blanco }],
+    cardImageUrl: "/assets/vehicles/sunray-v6-carga.png",
   }),
 ];
 
-export const DEFAULT_VEHICLE_SLUG = "aventura-4x4";
+export const DEFAULT_VEHICLE_SLUG = "elite";
 
 export const DEALERS = [{ id: "barquisimeto", city: "Barquisimeto", active: true }];
 
 export function getVehicleBySlug(slug: string): Vehicle | undefined {
   return VEHICLES.find((v) => v.slug === slug);
+}
+
+/** Un vehículo sin modelo 360° (sin sets de sprites) NO está disponible:
+ * se previsualiza como silueta pero no se puede entrar a su detalle. */
+export function isVehicleAvailable(vehicle: Vehicle): boolean {
+  return vehicle.variants[0].exteriorSprites.length > 0;
 }
 
 export function getVehiclesByCategory(categorySlug: string): Vehicle[] {

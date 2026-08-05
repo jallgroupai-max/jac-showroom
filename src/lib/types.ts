@@ -82,6 +82,9 @@ export interface Vehicle {
   typeTag: string; // ej. "Pickup · 221 hp"
   order: number;
   featureIcons: string[]; // íconos rápidos que se ven en la card del catálogo
+  /** Foto propia para la card del catálogo — si falta, se usa el thumbnail
+   * de la primera variante. */
+  cardImageUrl?: string;
   ownBackgroundUrl: string; // background "propio" del vehículo (escena "own")
   variants: VehicleVariant[];
   interior: InteriorSprites;

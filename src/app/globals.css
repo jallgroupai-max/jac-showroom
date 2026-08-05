@@ -7,7 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  /* Futura por defecto en TODOS los textos; fallbacks geométricos cercanos
+     (Futura PT, Century Gothic) y por último Inter (cargada vía next/font). */
+  --font-sans: Futura, "Futura PT", "Century Gothic", var(--font-inter), ui-sans-serif, sans-serif;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);

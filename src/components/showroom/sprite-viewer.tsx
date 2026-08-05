@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Minus, Plus, RotateCcw, RotateCw } from "lucide-react";
 import type { SpriteSet } from "@/lib/types";
+import { UNAVAILABLE_VEHICLE_IMAGE } from "@/lib/mock-data";
 import { MAX_SCALE, useVehicleViewer } from "@/hooks/use-vehicle-viewer";
 import { useSpriteQuality } from "@/hooks/use-sprite-quality";
 import { SceneBackground } from "./scene-background";
@@ -11,6 +12,11 @@ import { cn } from "@/lib/utils";
 
 interface SpriteViewerProps {
   cacheKey: string;
+  /** Identidad del VEHÍCULO (slug). Cuando cambia, la transición es un
+   * crossfade del vehículo completo (fade out del viejo + fade in del
+   * nuevo); el barrido de color queda reservado para cambios de cacheKey
+   * con el MISMO vehicleKey (cambio de color/vista del mismo vehículo). */
+  vehicleKey?: string;
   spriteSets: SpriteSet[];
   /** Alternativa a `backgroundColor` — foto de escena. */
   backgroundUrl?: string;
@@ -24,6 +30,9 @@ interface SpriteViewerProps {
   /** false mientras el selector de catálogo está abierto — oculta el pod de
    * girar/zoom, que no tiene sentido mostrar sobre esa pantalla. */
   showControls?: boolean;
+  /** Se dispara UNA sola vez, la primera vez que el usuario rota el vehículo
+   * (drag, botones de girar o flechas) — usado por el hint de "360°". */
+  onFirstRotate?: () => void;
 }
 
 const ROTATE_STEP = 3; // frames por clic (~30°) en los botones manuales
@@ -41,12 +50,14 @@ const ROTATE_STEP = 3; // frames por clic (~30°) en los botones manuales
  */
 export function SpriteViewer({
   cacheKey,
+  vehicleKey,
   spriteSets,
   backgroundUrl,
   backgroundColor,
   className,
   isFullscreen,
   showControls = true,
+  onFirstRotate,
 }: SpriteViewerProps) {
   const {
     frame,
@@ -63,11 +74,71 @@ export function SpriteViewer({
   } = useVehicleViewer(1);
   const { bestQuality } = useSpriteQuality(cacheKey, spriteSets);
 
-  const frameUrl = useMemo(() => {
+  // Vehículo sin modelo 360° ({modelo}/{color}/{quality} inexistente):
+  // sin sets no hay nada que rotar — silueta compartida + aviso.
+  const unavailable = spriteSets.length === 0;
+
+  // El frame arranca en 1: el primer cambio (por drag, botones o teclado)
+  // cuenta como "el usuario ya rotó" y se notifica una única vez.
+  const firstRotateNotified = useRef(false);
+  useEffect(() => {
+    if (frame === 1 || firstRotateNotified.current) return;
+    firstRotateNotified.current = true;
+    onFirstRotate?.();
+  }, [frame, onFirstRotate]);
+
+  const activeSet = useMemo(() => {
     if (!bestQuality) return null;
-    const set = spriteSets.find((s) => s.quality === bestQuality);
-    return set ? set.frameUrl(frame) : null;
-  }, [bestQuality, frame, spriteSets]);
+    return spriteSets.find((s) => s.quality === bestQuality) ?? null;
+  }, [bestQuality, spriteSets]);
+  const frameUrl = activeSet ? activeSet.frameUrl(frame) : null;
+
+  // Barrido de cambio de color en TRES fases: "preload" (esperar el frame
+  // visible del set nuevo — nunca barrer hacia una imagen a medio bajar),
+  // "sweep" (el color nuevo barre de izquierda a derecha sobre la capa
+  // anterior, que queda SÓLIDA debajo) y "fade" (con el color nuevo ya
+  // mostrado por completo, la capa saliente se desvanece con un fade de
+  // opacidad — nada desaparece de golpe).
+  const [wipe, setWipe] = useState<{ fromSet: SpriteSet; phase: "preload" | "sweep" | "fade" } | null>(null);
+  const prevKeyRef = useRef(cacheKey);
+  const prevVehicleRef = useRef(vehicleKey);
+  const lastSetRef = useRef<SpriteSet | null>(null);
+
+  useEffect(() => {
+    const vehicleChanged = prevVehicleRef.current !== vehicleKey;
+    prevVehicleRef.current = vehicleKey;
+    if (prevKeyRef.current === cacheKey) return;
+    prevKeyRef.current = cacheKey;
+    if (vehicleChanged) {
+      // Cambio de VEHÍCULO: la transición es el crossfade del AnimatePresence
+      // de abajo, no el barrido de color — se cancela cualquier barrido en
+      // curso para no barrer entre vehículos distintos.
+      setWipe(null);
+      return;
+    }
+    if (lastSetRef.current) setWipe({ fromSet: lastSetRef.current, phase: "preload" });
+  }, [cacheKey, vehicleKey]);
+
+  // Declarado DESPUÉS del efecto de arriba a propósito: ambos corren tras el
+  // mismo render y aquel necesita leer todavía el set del render anterior.
+  useEffect(() => {
+    if (activeSet) lastSetRef.current = activeSet;
+  }, [activeSet]);
+
+  useEffect(() => {
+    if (!wipe || wipe.phase !== "preload" || !frameUrl) return;
+    let cancelled = false;
+    const img = new window.Image();
+    const done = () => {
+      if (!cancelled) setWipe((w) => (w && w.phase === "preload" ? { ...w, phase: "sweep" } : w));
+    };
+    img.onload = done;
+    img.onerror = done;
+    img.src = frameUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [wipe, frameUrl]);
 
   return (
     <div
@@ -93,23 +164,94 @@ export function SpriteViewer({
       >
         <SceneBackground imageUrl={backgroundUrl} color={backgroundColor} />
 
-        <div className="absolute inset-0 flex items-end justify-center ">
-          {frameUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- secuencia de frames servida directo, no encaja con next/image
-            <img
-              src={frameUrl}
-              alt="Vista del vehículo"
-              draggable={false}
-              className="pointer-events-none h-[85%] max-w-[90%] object-contain drop-shadow-2xl lg:h-[92%] lg:max-w-[82%]"
-            />
+        {/* Cambio de VEHÍCULO = crossfade: la capa del vehículo saliente
+            (congelada en su último frame) se desvanece mientras la del nuevo
+            aparece — el fondo de escena NO participa del fade, solo el
+            vehículo (o la silueta de "no disponible"). */}
+        <AnimatePresence initial={false}>
+          <motion.div
+            key={vehicleKey ?? "vehicle"}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+            className="absolute inset-0 flex items-end justify-center"
+          >
+          {unavailable ? (
+            <div className="relative flex h-[85%] max-w-[90%] translate-y-[6%] items-center justify-center lg:h-[92%] lg:max-w-[82%]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- silueta compartida servida directo */}
+              <img
+                src={UNAVAILABLE_VEHICLE_IMAGE}
+                alt=""
+                aria-hidden
+                draggable={false}
+                className="pointer-events-none h-[62.5%] w-auto max-w-full object-contain"
+              />
+              <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-xl font-extrabold uppercase tracking-widest text-white sm:text-2xl">
+                Vehículo no disponible
+              </p>
+            </div>
+          ) : frameUrl ? (
+            wipe ? (
+              <>
+                {/* Capa saliente (color anterior): SÓLIDA mientras el barrido
+                    la cubre (sigue rotando en vivo — sus frames ya están en
+                    caché). Al terminar el barrido, con el color nuevo ya
+                    mostrado por completo, se desvanece con un fade de
+                    opacidad y recién al completarlo se desmonta todo. */}
+                <motion.img
+                  src={wipe.fromSet.frameUrl(frame)}
+                  alt="Vista del vehículo"
+                  draggable={false}
+                  initial={false}
+                  animate={{ opacity: wipe.phase === "fade" ? 0 : 1 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  onAnimationComplete={() => {
+                    if (wipe.phase === "fade") setWipe(null);
+                  }}
+                  className="pointer-events-none h-[85%] max-w-[90%] object-contain drop-shadow-2xl lg:h-[92%] lg:max-w-[82%]"
+                />
+                {/* El color nuevo entra con barrido + fade 0 -> 1 sobre la
+                    capa saliente: la zona ya barrida se va solidificando
+                    mientras el resto conserva el color anterior intacto. */}
+                <motion.img
+                  key={cacheKey}
+                  src={frameUrl}
+                  alt=""
+                  aria-hidden
+                  draggable={false}
+                  initial={{ clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+                  animate={
+                    wipe.phase === "preload"
+                      ? { clipPath: "inset(0 100% 0 0)", opacity: 0 }
+                      : { clipPath: "inset(0 0% 0 0)", opacity: 1 }
+                  }
+                  transition={{ duration: 0.85, ease: "easeInOut" }}
+                  onAnimationComplete={() => {
+                    if (wipe.phase === "sweep") setWipe((w) => (w ? { ...w, phase: "fade" } : w));
+                  }}
+                  className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-[85%] max-w-[90%] object-contain drop-shadow-2xl lg:h-[92%] lg:max-w-[82%]"
+                />
+              </>
+            ) : (
+              // Sin transición en curso: una sola capa con el color activo.
+              // eslint-disable-next-line @next/next/no-img-element -- secuencia de frames servida directo, no encaja con next/image
+              <img
+                src={frameUrl}
+                alt="Vista del vehículo"
+                draggable={false}
+                className="pointer-events-none h-[85%] max-w-[90%] object-contain drop-shadow-2xl lg:h-[92%] lg:max-w-[82%]"
+              />
+            )
           ) : (
             <div className="h-16 w-16 animate-pulse rounded-full bg-white/40" aria-hidden />
           )}
-        </div>
+          </motion.div>
+        </AnimatePresence>
       </motion.div>
 
       <AnimatePresence>
-        {showControls && (
+        {showControls && !unavailable && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

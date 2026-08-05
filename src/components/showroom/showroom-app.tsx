@@ -3,7 +3,14 @@
 import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Scene, ViewMode } from "@/lib/types";
-import { CATEGORIES, DEFAULT_VEHICLE_SLUG, SCENES, getVehicleBySlug, getVehiclesByCategory } from "@/lib/mock-data";
+import {
+  CATEGORIES,
+  DEFAULT_VEHICLE_SLUG,
+  SCENES,
+  getVehicleBySlug,
+  getVehiclesByCategory,
+  isVehicleAvailable,
+} from "@/lib/mock-data";
 import { spriteCacheKey } from "@/lib/sprite-cache";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { LoadingScreen } from "./loading-screen";
@@ -15,6 +22,7 @@ import { PointsOfInterest } from "./points-of-interest";
 import { SpecsPanel } from "./specs-panel";
 import { LeadForm } from "./lead-form";
 import { LeadConfirmation } from "./lead-confirmation";
+import { cn } from "@/lib/utils";
 
 type SubPhase = "catalog" | "visualizer";
 
@@ -74,6 +82,9 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const [specsOpen, setSpecsOpen] = useState(false);
   const [leadFormOpen, setLeadFormOpen] = useState(false);
   const [leadConfirmationOpen, setLeadConfirmationOpen] = useState(false);
+  // El hint de "arrastra para rotar" parpadea hasta la PRIMERA rotación de la
+  // sesión (cualquier vehículo) — después queda estático.
+  const [hasRotated, setHasRotated] = useState(false);
 
   // Sincronización con matchMedia vía useSyncExternalStore (patrón
   // recomendado por React para esto — sin efecto, sin setState-in-effect).
@@ -94,6 +105,9 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const headerRef = useRef<HTMLElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
+  // Posición del pointerdown sobre el héroe — distingue clic de arrastre
+  // para el cierre del selector de vehículos.
+  const heroPressRef = useRef<{ x: number; y: number } | null>(null);
 
   useLayoutEffect(() => {
     const header = headerRef.current;
@@ -120,6 +134,10 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const backgroundColor = activeScene?.color;
   const backgroundUrl = backgroundColor ? undefined : (activeScene?.imageUrl ?? vehicle.ownBackgroundUrl);
 
+  // Clic simple en una tarjeta: solo cambia el vehículo (se previsualiza en
+  // el héroe detrás) y el selector QUEDA abierto — los controles de color y
+  // demás no se despliegan todavía. El selector se cierra con doble clic
+  // sobre la tarjeta o con un clic fuera de la sección (ver abajo).
   function selectVehicle(slug: string) {
     const next = getVehicleBySlug(slug);
     if (!next) return;
@@ -127,6 +145,14 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
     setActiveVariantId(next.variants[0].id);
     // El modo Exterior/Interior PERSISTE al cambiar de vehículo (confirmado
     // en conversación) — no se resetea acá.
+  }
+
+  function confirmVehicle() {
+    // Un vehículo NO disponible (sin modelo 360°) no tiene detalle al que
+    // entrar: ni el doble clic ni el clic fuera cierran el selector — solo
+    // se puede confirmar un vehículo disponible.
+    const active = getVehicleBySlug(activeVehicleSlug);
+    if (!active || !isVehicleAvailable(active)) return;
     setSubPhase("visualizer");
   }
 
@@ -164,27 +190,48 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
       {/* Body/héroe — franja compacta de alto fijo en mobile/tablet (la
           página hace scroll debajo); siempre flex-1 (100dvh - header) desde
           desktop, donde los controles de abajo salen del flujo
-          (lg:absolute) y el héroe reclama todo el espacio libre. */}
-      <div className="relative h-[38vh] shrink-0 overflow-hidden lg:h-auto lg:flex-1">
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.div
-            key={vehicle.slug}
-            className="absolute inset-0"
-            initial={{ x: "100%", opacity: 0.4 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: "-100%", opacity: 0.4 }}
-            transition={{ type: "tween", duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <SpriteViewer
-              cacheKey={cacheKey}
-              spriteSets={spriteSets}
-              backgroundUrl={backgroundUrl}
-              backgroundColor={backgroundColor}
-              isFullscreen={isFullscreen}
-              showControls={subPhase === "visualizer"}
-            />
-          </motion.div>
-        </AnimatePresence>
+          (lg:absolute) y el héroe reclama todo el espacio libre.
+          Con el selector de vehículos abierto, un CLIC fuera de esa sección
+          (sobre el héroe) lo cierra y vuelve a los controles — con umbral de
+          movimiento para que un arrastre de rotación no cuente como clic. */}
+      <div
+        className="relative h-[38vh] shrink-0 overflow-hidden lg:h-auto lg:flex-1"
+        onPointerDown={(e) => {
+          heroPressRef.current = { x: e.clientX, y: e.clientY };
+        }}
+        onClick={(e) => {
+          const press = heroPressRef.current;
+          heroPressRef.current = null;
+          if (subPhase !== "catalog") return;
+          if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) return;
+          confirmVehicle();
+        }}
+      >
+        {/* El viewer queda SIEMPRE montado (sin key por vehículo ni slide de
+            pantalla completa): al cambiar de vehículo solo cambian
+            cacheKey/spriteSets/vehicleKey y el propio viewer hace la
+            transición en su lugar — crossfade (fade out del viejo, fade in
+            del nuevo) entre vehículos, barrido para cambios de color.
+            Al abrir el selector de vehículos (solo desktop, donde el
+            catálogo flota encima), el héroe completo (fondo + vehículo) se
+            desplaza hacia arriba EN PARALELO con el despliegue del carrusel:
+            misma duración y curva que la animación del panel de abajo. */}
+        <motion.div
+          className="absolute inset-0"
+          animate={{ y: isDesktop && subPhase === "catalog" ? "-18%" : "0%" }}
+          transition={{ duration: 0.45, ease: "easeInOut" }}
+        >
+          <SpriteViewer
+            cacheKey={cacheKey}
+            vehicleKey={vehicle.slug}
+            spriteSets={spriteSets}
+            backgroundUrl={backgroundUrl}
+            backgroundColor={backgroundColor}
+            isFullscreen={isFullscreen}
+            showControls={subPhase === "visualizer"}
+            onFirstRotate={() => setHasRotated(true)}
+          />
+        </motion.div>
 
         {subPhase === "visualizer" && (
           <button
@@ -201,7 +248,12 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
           debajo del héroe (visible tanto en catálogo como en visualizador);
           en desktop sigue agrupado con el toolbar de POI, más abajo. */}
       <div className="flex shrink-0 justify-center px-4 pt-3 mb-2 lg:hidden">
-        <div className="pointer-events-none rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm">
+        <div
+          className={cn(
+            "pointer-events-none rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm",
+            !hasRotated && "animate-pulse"
+          )}
+        >
           Haz clic y arrastra para rotar{" "}
           <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
         </div>
@@ -218,7 +270,10 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "60%", opacity: 0 }}
               transition={{ duration: 0.45, ease: "easeInOut" }}
-              className="h-auto rounded-3xl bg-white/70 backdrop-blur lg:h-75"
+              // En desktop rompe el max-w-6xl del contenedor padre y ocupa el
+              // 100% del ancho de pantalla (full-bleed) — el carrusel de
+              // vehículos va de extremo a extremo.
+              className="h-auto lg:h-[25rem] lg:w-screen lg:ml-[calc(50%-50vw)]"
             >
               <CatalogPanel
                 categories={CATEGORIES}
@@ -227,7 +282,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
                 vehicles={vehiclesInCategory}
                 activeVehicleSlug={activeVehicleSlug}
                 onSelectVehicle={selectVehicle}
-                onClose={() => setSubPhase("visualizer")}
+                onConfirmVehicle={confirmVehicle}
               />
             </motion.div>
           ) : (
@@ -239,13 +294,18 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               transition={{ duration: 0.45, ease: "easeInOut" }}
               className="flex flex-col gap-3"
             >
-              <div className="hidden items-center justify-between gap-3 lg:flex">
+              <div className="relative hidden items-center gap-3 lg:flex">
                 <PointsOfInterest points={vehicle.pointsOfInterest} mode={viewMode} />
-                <div className="flex flex-1 justify-end">
-                  <div className="pointer-events-none rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm">
-                    Haz clic y arrastra para rotar{" "}
-                    <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
-                  </div>
+                {/* Centrado absoluto respecto al ancho completo de la fila —
+                    los POI de la izquierda no lo desplazan del centro. */}
+                <div
+                  className={cn(
+                    "pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm",
+                    !hasRotated && "animate-pulse"
+                  )}
+                >
+                  Haz clic y arrastra para rotar{" "}
+                  <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
                 </div>
               </div>
               <VisualizerControls

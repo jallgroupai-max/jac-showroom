@@ -1,0 +1,13 @@
+# Fuera del contexto de build: artefactos locales y todo lo que la imagen
+# no necesita (el build corre DENTRO del contenedor con sus propios deps).
+node_modules
+.next
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+AGENTS.md
+CLAUDE.md
+tsconfig.tsbuildinfo
+npm-debug.log*

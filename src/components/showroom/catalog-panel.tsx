@@ -1,8 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import AutoScroll from "embla-carousel-auto-scroll";
-import { X } from "lucide-react";
 import type { Category, Vehicle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -12,27 +11,26 @@ interface CatalogPanelProps {
   onCategoryChange: (slug: string) => void;
   vehicles: Vehicle[];
   activeVehicleSlug: string;
+  /** Clic simple: cambia el vehículo previsualizado SIN cerrar el selector. */
   onSelectVehicle: (slug: string) => void;
-  onClose: () => void;
+  /** Doble clic sobre la tarjeta: confirma y cierra el selector. */
+  onConfirmVehicle: () => void;
 }
 
-// El loop nativo de Embla solo funciona si el contenido "de respaldo" (todas
-// las tarjetas salvo la que hace de punto de envoltura) alcanza a cubrir el
-// viewport — con pocas tarjetas angostas eso no se cumple y Embla desactiva
-// el loop en silencio, congelando el auto-scroll al llegar al final. Se
-// repite el set las veces necesarias para garantizar ese margen (mismo
-// patrón que usan los demos oficiales de "marquee" de Embla).
-const MIN_LOOP_SLIDES = 8;
+// Selección en dos tiempos: primero el resaltado azul del vehículo anterior
+// se desvanece (transition-colors `duration-300` de la tarjeta) y RECIÉN
+// entonces el carrusel se desplaza animado hasta centrar la tarjeta nueva.
+const HIGHLIGHT_FADE_MS = 300;
 
 /**
  * "Selecciona tu vehículo" — ver recursos/diseño-ux/Home-1.0.0-*.png.
- * Carrusel infinito con Embla Carousel (`embla-carousel-react` +
- * `embla-carousel-auto-scroll`) — desplazamiento continuo a velocidad
- * constante, sin saltos, en loop real, sin controles manuales (sin flechas).
- * Se pausa con hover/foco. El autoplay no selecciona ni abre ningún
- * vehículo — el resaltado azul (#5D95B7, muestreado del mockup) y la
- * apertura del visualizador solo ocurren al hacer clic directamente sobre
- * una tarjeta.
+ * Carrusel Embla arrastrable con dedo o mouse, FINITO (cada vehículo aparece
+ * UNA sola vez — arrastrar más allá de los extremos rebota de vuelta), SIN
+ * desplazamiento automático ni flechas: solo se mueve cuando el usuario lo
+ * arrastra. Abre con el vehículo seleccionado centrado (startIndex + align
+ * center). El resaltado azul (#5D95B7, muestreado del mockup) y la apertura
+ * del visualizador solo ocurren al hacer clic sobre una tarjeta — Embla ya
+ * cancela el clic cuando el gesto fue un arrastre.
  */
 export function CatalogPanel({
   categories,
@@ -41,30 +39,67 @@ export function CatalogPanel({
   vehicles,
   activeVehicleSlug,
   onSelectVehicle,
-  onClose,
+  onConfirmVehicle,
 }: CatalogPanelProps) {
-  const [emblaRef] = useEmblaCarousel(
-    { loop: true, dragFree: true, align: "start", startIndex: 0, skipSnaps: true },
-    [AutoScroll({ speed: 0.7, startDelay: 0, stopOnInteraction: false, stopOnMouseEnter: true, stopOnFocusIn: true })]
+  const activeIndex = Math.max(0, vehicles.findIndex((v) => v.slug === activeVehicleSlug));
+
+  // startIndex capturado UNA sola vez (al montar): si se recalculara con cada
+  // selección, embla se reinicializaría y la tarjeta nueva saltaría al centro
+  // de golpe — el centrado posterior se hace con scrollTo animado (abajo).
+  const [initialIndex] = useState(activeIndex);
+
+  // Sin dragFree: al soltar, Embla ajusta al snap más cercano. Carrusel
+  // FINITO (sin loop — arrastrar más allá de los extremos rebota de vuelta);
+  // containScroll desactivado para que align:center pueda centrar TAMBIÉN la
+  // primera y la última tarjeta — el vehículo seleccionado siempre puede
+  // quedar en el medio, aunque a los costados quede espacio libre.
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: "center",
+    containScroll: false,
+    startIndex: initialIndex,
+  });
+
+  // Cambio de categoría = otro set de tarjetas: salto instantáneo al inicio
+  // (es un cambio de contexto, no una selección — sin animación).
+  const prevCategoryRef = useRef(activeCategorySlug);
+  useEffect(() => {
+    if (prevCategoryRef.current === activeCategorySlug) return;
+    prevCategoryRef.current = activeCategorySlug;
+    emblaApi?.scrollTo(0, true);
+  }, [activeCategorySlug, emblaApi]);
+
+  const scrollTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
+    },
+    []
   );
 
-  const repeatCount = vehicles.length > 1 ? Math.max(2, Math.ceil(MIN_LOOP_SLIDES / vehicles.length)) : 1;
-  const loopVehicles = Array.from({ length: repeatCount }, () => vehicles).flat();
+  // Clic en una tarjeta: la selección (resaltado + previsualización en el
+  // héroe) es inmediata; el desplazamiento del carrusel espera a que el fade
+  // del resaltado anterior termine y recién ahí centra la tarjeta clicada,
+  // con la animación de scroll propia de Embla.
+  function handleSelect(slug: string, index: number) {
+    onSelectVehicle(slug);
+    if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = window.setTimeout(() => {
+      scrollTimerRef.current = null;
+      emblaApi?.scrollTo(index);
+    }, HIGHLIGHT_FADE_MS);
+  }
 
   return (
-    <div className="relative flex h-full flex-col items-center gap-5 overflow-hidden px-4 pb-4 pt-5 sm:pt-6">
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Ocultar selector de vehículos"
-        className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#6B7280] shadow-sm transition-colors hover:bg-[#F4F6F9] hover:text-[#12141A] sm:right-4 sm:top-4"
-      >
-        <X className="h-4 w-4" />
-      </button>
+    <div className="relative flex h-full flex-col items-center gap-5 overflow-hidden px-4 pb-4 pt-5 sm:pt-6 lg:px-0 lg:pt-30">
+      {/* Encabezado: apilado y centrado en mobile; en desktop una sola fila
+          del ancho del carrusel (1160px) con el título a la IZQUIERDA y las
+          pestañas de categoría centradas, ambos a la misma altura. */}
+      <div className="flex w-full flex-col items-center gap-5 lg:relative lg:mx-auto lg:w-[1160px] lg:max-w-full lg:flex-row lg:justify-center lg:gap-0">
+        <h2 className="text-xl font-extrabold text-[#12141A] sm:text-2xl lg:absolute lg:left-3 lg:top-1/2 lg:-translate-y-1/2">
+          Selecciona tu vehículo
+        </h2>
 
-      <h2 className="text-xl font-extrabold text-[#12141A] sm:text-2xl">Selecciona tu vehículo</h2>
-
-      <div className="flex items-center gap-1 rounded-full bg-white p-1 shadow-sm">
+        <div className="flex items-center gap-1 rounded-full bg-white p-1 shadow-sm">
         {categories.map((c) => (
           <button
             key={c.slug}
@@ -78,6 +113,7 @@ export function CatalogPanel({
             {c.name}
           </button>
         ))}
+        </div>
       </div>
 
       {vehicles.length === 0 ? (
@@ -86,17 +122,30 @@ export function CatalogPanel({
         </div>
       ) : (
         <div className="relative w-full flex-1">
-          <div className="h-full w-full overflow-hidden" ref={emblaRef}>
-            <div className="flex h-full gap-3 px-[10%]">
-              {loopVehicles.map((v, i) => {
+          {/* En desktop el viewport del carrusel mide exactamente 5 slides
+              (5 × 232px) centrado — nunca se ve una sexta tarjeta. */}
+          <div
+            className="h-full w-full cursor-grab overflow-hidden active:cursor-grabbing lg:mx-auto lg:w-[1160px] lg:max-w-full"
+            ref={emblaRef}
+          >
+            <div className="flex h-full items-center gap-3 lg:gap-0">
+              {vehicles.map((v, i) => {
                 const isActive = v.slug === activeVehicleSlug;
                 return (
+                  // Slide: ancho fijo en mobile; en desktop 232px (tarjeta
+                  // CUADRADA de 220 + 12 de separación interna).
+                  <div
+                    key={v.slug}
+                    className="flex min-w-0 shrink-0 grow-0 basis-[190px] sm:basis-[220px] lg:basis-[232px] lg:px-1.5"
+                  >
                   <button
-                    key={`${v.slug}-${i}`}
                     type="button"
-                    onClick={() => onSelectVehicle(v.slug)}
+                    onClick={() => handleSelect(v.slug, i)}
+                    // El primer clic del doble clic ya seleccionó este
+                    // vehículo — el doble clic solo confirma y cierra.
+                    onDoubleClick={onConfirmVehicle}
                     className={cn(
-                      "relative flex w-[190px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl p-4 text-left transition-colors sm:w-[220px]",
+                      "relative flex h-[180px] w-full flex-col justify-between overflow-hidden rounded-2xl p-4 text-left transition-colors duration-300",
                       isActive ? "bg-[#5D95B7] text-white" : "bg-[#FBFBFB] text-[#12141A]"
                     )}
                   >
@@ -104,26 +153,39 @@ export function CatalogPanel({
                       <p className="text-base font-bold leading-tight">{v.commercialName}</p>
                       <p className={cn("text-xs", isActive ? "text-white/80" : "text-[#6B7280]")}>{v.typeTag}</p>
                     </div>
-                    <div className="mt-2 flex items-end justify-between">
-                      <div className="flex gap-1">
-                        {v.featureIcons.slice(0, 2).map((icon) => (
-                          <span
-                            key={icon}
-                            className={cn(
-                              "flex h-7 w-7 items-center justify-center rounded-full text-[10px]",
-                              isActive ? "bg-white/25" : "bg-[#EEF0F3]"
-                            )}
-                            aria-hidden
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element -- ícono SVG suelto de recursos/Iconos */}
-                            <img src={`/assets/icons/${icon}.svg`} alt="" className="h-4 w-4" />
-                          </span>
-                        ))}
-                      </div>
-                      {/* eslint-disable-next-line @next/next/no-img-element -- thumbnail placeholder de sprite */}
-                      <img src={v.variants[0].thumbnailUrl} alt={v.commercialName} className="h-16 w-auto object-contain" draggable={false} />
+                    {/* Vehículo grande recortado por el borde derecho de la
+                        tarjeta (overflow-hidden): solo se ve ~la mitad, fiel
+                        al Figma. `max-w-none` evita que el contenedor lo
+                        encoja; el translate empuja la otra mitad fuera. Es
+                        absoluto con altura FIJA — nada del contenido de la
+                        tarjeta (chips incluidos) puede reducirlo. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element -- thumbnail placeholder de sprite */}
+                    <img
+                      src={v.cardImageUrl ?? v.variants[0].thumbnailUrl}
+                      alt={v.commercialName}
+                      draggable={false}
+                      className="pointer-events-none absolute bottom-1 right-0 h-32 w-auto max-w-none translate-x-[45%] object-contain sm:h-36"
+                    />
+                    {/* Tipos del vehículo (eléctrico/gasolina/gasoil/4x4,
+                        combinables) flotando en la esquina inferior
+                        izquierda, FUERA del flujo — no disputan espacio con
+                        la imagen. Los SVG son el chip completo exportado de
+                        Figma (lienzo 52x52 con círculo y sombra propios),
+                        renderizados 1:1. */}
+                    <div className="absolute bottom-2 left-2 z-10 flex">
+                      {v.featureIcons.slice(0, 2).map((icon) => (
+                        // eslint-disable-next-line @next/next/no-img-element -- ícono SVG suelto de recursos/Iconos
+                        <img
+                          key={icon}
+                          src={`/assets/icons/${icon}.svg`}
+                          alt=""
+                          aria-hidden
+                          className="h-13 w-13"
+                        />
+                      ))}
                     </div>
                   </button>
+                  </div>
                 );
               })}
             </div>

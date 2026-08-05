@@ -22,7 +22,7 @@ export function PointsOfInterest({ points, mode }: PointsOfInterestProps) {
   const active = filtered.find((p) => p.id === openId);
 
   return (
-    <div className="flex flex-row gap-2">
+    <div className="flex flex-row gap-3">
       {filtered.map((poi) => (
         <div key={poi.id} className="relative">
           <button
@@ -31,12 +31,14 @@ export function PointsOfInterest({ points, mode }: PointsOfInterestProps) {
             title={poi.title}
             onClick={() => setOpenId((cur) => (cur === poi.id ? null : poi.id))}
             className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-full bg-white/85 text-[#12141A] shadow-sm backdrop-blur transition-transform hover:scale-105",
+              "flex h-13 w-13 items-center justify-center rounded-full bg-white/85 text-[#12141A] shadow-sm backdrop-blur transition-transform hover:scale-105",
               openId === poi.id && "ring-2 ring-[#111318]"
             )}
           >
+            {/* Ícono grande respecto al círculo (≈70%), fiel al Figma — solo
+                queda un anillo fino de aire alrededor. */}
             {/* eslint-disable-next-line @next/next/no-img-element -- ícono SVG suelto de recursos/Iconos */}
-            <img src={`/assets/icons/${poi.icon}.svg`} alt="" aria-hidden className="h-5 w-5" />
+            <img src={`/assets/icons/${poi.icon}.svg`} alt="" aria-hidden className="h-10 w-10" />
           </button>
           {active?.id === poi.id && (
             <div
