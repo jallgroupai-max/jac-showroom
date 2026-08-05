@@ -4,11 +4,16 @@
 # node_modules trazados, los estáticos del build y public/ (sprites 360°,
 # fondos e íconos). Next 16 exige Node >= 20.9.
 
-# ---- deps: dependencias reproducibles desde el lockfile ----
+# ---- deps: dependencias desde el lockfile ----
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# `npm install` y NO `npm ci`: el lockfile generado en Windows omite las
+# transitivas de los bindings opcionales de otras plataformas
+# (@unrs/*-wasm32-wasi → @emnapi/*) y el chequeo estricto de `npm ci` en
+# Linux lo rechaza (EUSAGE Missing). `npm install` respeta las versiones del
+# lock y solo rellena esos huecos resolviéndolos.
+RUN npm install --no-audit --no-fund
 
 # ---- builder: compila la app en modo standalone ----
 FROM node:22-alpine AS builder
