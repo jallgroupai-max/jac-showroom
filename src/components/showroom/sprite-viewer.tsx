@@ -59,6 +59,16 @@ export function SpriteViewer({
   showControls = true,
   onFirstRotate,
 }: SpriteViewerProps) {
+  // Barrido de cambio de color en TRES fases: "preload" (esperar el frame
+  // visible del set nuevo — nunca barrer hacia una imagen a medio bajar),
+  // "sweep" (el color nuevo barre de izquierda a derecha sobre la capa
+  // anterior, que queda SÓLIDA debajo) y "fade" (con el color nuevo ya
+  // mostrado por completo, la capa saliente se desvanece con un fade de
+  // opacidad — nada desaparece de golpe). Mientras la transición exista
+  // (wipe !== null) la ROTACIÓN queda bloqueada — drag, botones y flechas —
+  // y se libera recién cuando el fade final desmonta la capa saliente.
+  const [wipe, setWipe] = useState<{ fromSet: SpriteSet; phase: "preload" | "sweep" | "fade" } | null>(null);
+
   const {
     frame,
     scale,
@@ -71,7 +81,7 @@ export function SpriteViewer({
     zoomOut,
     pointerHandlers,
     keyboardHandlers,
-  } = useVehicleViewer(1);
+  } = useVehicleViewer(1, wipe !== null);
   const { bestQuality } = useSpriteQuality(cacheKey, spriteSets);
 
   // Vehículo sin modelo 360° ({modelo}/{color}/{quality} inexistente):
@@ -93,13 +103,6 @@ export function SpriteViewer({
   }, [bestQuality, spriteSets]);
   const frameUrl = activeSet ? activeSet.frameUrl(frame) : null;
 
-  // Barrido de cambio de color en TRES fases: "preload" (esperar el frame
-  // visible del set nuevo — nunca barrer hacia una imagen a medio bajar),
-  // "sweep" (el color nuevo barre de izquierda a derecha sobre la capa
-  // anterior, que queda SÓLIDA debajo) y "fade" (con el color nuevo ya
-  // mostrado por completo, la capa saliente se desvanece con un fade de
-  // opacidad — nada desaparece de golpe).
-  const [wipe, setWipe] = useState<{ fromSet: SpriteSet; phase: "preload" | "sweep" | "fade" } | null>(null);
   const prevKeyRef = useRef(cacheKey);
   const prevVehicleRef = useRef(vehicleKey);
   const lastSetRef = useRef<SpriteSet | null>(null);
@@ -199,10 +202,11 @@ export function SpriteViewer({
             wipe ? (
               <>
                 {/* Capa saliente (color anterior): SÓLIDA mientras el barrido
-                    la cubre (sigue rotando en vivo — sus frames ya están en
-                    caché). Al terminar el barrido, con el color nuevo ya
-                    mostrado por completo, se desvanece con un fade de
-                    opacidad y recién al completarlo se desmonta todo. */}
+                    la cubre, congelada en el frame vigente (la rotación queda
+                    bloqueada durante toda la transición). Al terminar el
+                    barrido, con el color nuevo ya mostrado por completo, se
+                    desvanece con un fade de opacidad y recién al completarlo
+                    se desmonta todo — ahí se libera la rotación. */}
                 <motion.img
                   src={wipe.fromSet.frameUrl(frame)}
                   alt="Vista del vehículo"
@@ -274,9 +278,10 @@ export function SpriteViewer({
                   rotateBy(-ROTATE_STEP);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
+                disabled={wipe !== null}
                 aria-label="Girar a la izquierda"
                 title="Girar a la izquierda"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#12141A] shadow-md backdrop-blur transition-all hover:scale-105 hover:bg-[#111318] hover:text-white focus-visible:bg-[#111318] focus-visible:text-white focus-visible:outline-none"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#12141A] shadow-md backdrop-blur transition-all hover:scale-105 hover:bg-[#111318] hover:text-white focus-visible:bg-[#111318] focus-visible:text-white focus-visible:outline-none disabled:opacity-40 disabled:hover:scale-100 disabled:hover:bg-white/90 disabled:hover:text-[#12141A]"
               >
                 <RotateCcw className="h-4 w-4 -rotate-12" />
               </button>
@@ -287,9 +292,10 @@ export function SpriteViewer({
                   rotateBy(ROTATE_STEP);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
+                disabled={wipe !== null}
                 aria-label="Girar a la derecha"
                 title="Girar a la derecha"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#12141A] shadow-md backdrop-blur transition-all hover:scale-105 hover:bg-[#111318] hover:text-white focus-visible:bg-[#111318] focus-visible:text-white focus-visible:outline-none"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#12141A] shadow-md backdrop-blur transition-all hover:scale-105 hover:bg-[#111318] hover:text-white focus-visible:bg-[#111318] focus-visible:text-white focus-visible:outline-none disabled:opacity-40 disabled:hover:scale-100 disabled:hover:bg-white/90 disabled:hover:text-[#12141A]"
               >
                 <RotateCw className="h-4 w-4 rotate-12" />
               </button>

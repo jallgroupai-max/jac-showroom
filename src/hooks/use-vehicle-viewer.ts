@@ -55,8 +55,13 @@ interface UseVehicleViewerResult {
  * vehículo (comportamiento histórico, sin cambios); en cuanto hay zoom
  * aplicado, el mismo arrastre desplaza (pan) la vista en su lugar. El pellizco
  * de dos dedos, la rueda del mouse y el doble clic hacen zoom directamente.
+ *
+ * `rotationLocked` congela SOLO la rotación (drag, botones y flechas)
+ * mientras esté en true — p. ej. durante el barrido de cambio de color
+ * (sprite-viewer.tsx): el giro a mitad de barrido desincronizaría las dos
+ * capas de la transición. El zoom/pan no se bloquea.
  */
-export function useVehicleViewer(initialFrame = 1): UseVehicleViewerResult {
+export function useVehicleViewer(initialFrame = 1, rotationLocked = false): UseVehicleViewerResult {
   const [frame, setFrame] = useState(initialFrame);
   const [scale, setScale] = useState(MIN_SCALE);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
@@ -84,9 +89,13 @@ export function useVehicleViewer(initialFrame = 1): UseVehicleViewerResult {
     [clampOffset]
   );
 
-  const rotateBy = useCallback((deltaFrames: number) => {
-    setFrame((f) => wrapFrame(f + deltaFrames));
-  }, []);
+  const rotateBy = useCallback(
+    (deltaFrames: number) => {
+      if (rotationLocked) return;
+      setFrame((f) => wrapFrame(f + deltaFrames));
+    },
+    [rotationLocked]
+  );
 
   const zoomIn = useCallback(() => applyScale(scale + ZOOM_STEP), [applyScale, scale]);
   const zoomOut = useCallback(() => applyScale(scale - ZOOM_STEP), [applyScale, scale]);
@@ -129,6 +138,11 @@ export function useVehicleViewer(initialFrame = 1): UseVehicleViewerResult {
           setOffset(
             clampOffset({ x: dragStart.current.offset.x + deltaX, y: dragStart.current.offset.y + deltaY }, scale)
           );
+        } else if (rotationLocked) {
+          // Rotación bloqueada: el arrastre no gira NI acumula — el punto de
+          // partida se re-ancla al puntero para que, al desbloquear en medio
+          // de un drag, el vehículo no salte por el delta acumulado.
+          dragStart.current = { ...dragStart.current, x: e.clientX };
         } else {
           // El giro sigue la dirección del arrastre: mover a la izquierda gira a la izquierda.
           const deltaFrames = Math.round(deltaX / DRAG_SENSITIVITY);
@@ -136,7 +150,7 @@ export function useVehicleViewer(initialFrame = 1): UseVehicleViewerResult {
         }
       }
     },
-    [applyScale, clampOffset, scale]
+    [applyScale, clampOffset, scale, rotationLocked]
   );
 
   const endPointer = useCallback((e: React.PointerEvent) => {
@@ -165,10 +179,10 @@ export function useVehicleViewer(initialFrame = 1): UseVehicleViewerResult {
     (e: React.KeyboardEvent) => {
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        setFrame((f) => wrapFrame(f + 1));
+        if (!rotationLocked) setFrame((f) => wrapFrame(f + 1));
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
-        setFrame((f) => wrapFrame(f - 1));
+        if (!rotationLocked) setFrame((f) => wrapFrame(f - 1));
       } else if (e.key === "+" || e.key === "=") {
         e.preventDefault();
         zoomIn();
@@ -180,7 +194,7 @@ export function useVehicleViewer(initialFrame = 1): UseVehicleViewerResult {
         resetZoom();
       }
     },
-    [zoomIn, zoomOut, resetZoom]
+    [zoomIn, zoomOut, resetZoom, rotationLocked]
   );
 
   return {
