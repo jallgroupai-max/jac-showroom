@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { PointOfInterest, ViewMode } from "@/lib/types";
+import { iconAssetUrl } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 interface PointsOfInterestProps {
@@ -38,7 +39,7 @@ export function PointsOfInterest({ points, mode }: PointsOfInterestProps) {
             {/* Ícono grande respecto al círculo (≈70%), fiel al Figma — solo
                 queda un anillo fino de aire alrededor. */}
             {/* eslint-disable-next-line @next/next/no-img-element -- ícono SVG suelto de recursos/Iconos */}
-            <img src={`/assets/icons/${poi.icon}.svg`} alt="" aria-hidden className="h-10 w-10" />
+            <img src={iconAssetUrl(poi.icon)} alt="" aria-hidden className="h-10 w-10" />
           </button>
           {active?.id === poi.id && (
             <div

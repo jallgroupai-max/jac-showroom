@@ -1,50 +1,122 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Quality, SpriteSet } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import type { Vehicle } from "@/lib/types";
 import { QUALITIES } from "@/lib/types";
 import { readyThresholdForTier, useConnectionTier } from "@/lib/connection";
-import { useSpriteQuality } from "@/hooks/use-sprite-quality";
+import { getPreloadAssetUrls } from "@/lib/mock-data";
+import {
+  FRAME_COUNT,
+  loadSpriteSetsUpTo,
+  preloadStaticAssets,
+  spriteCacheKey,
+} from "@/lib/sprite-cache";
 
 interface LoadingScreenProps {
-  cacheKey: string;
-  spriteSets: SpriteSet[];
+  /** Vehículo inicial — se precargan TODOS sus colores antes de entrar. */
+  vehicle: Vehicle;
   onReady: () => void;
 }
 
-function qualityIndex(q: Quality | null): number {
-  return q ? QUALITIES.indexOf(q) : -1;
-}
-
 /**
- * Ver docs/APP-FLOW.md §3.1 y docs/TRD.md §4.2. Progreso REAL (no simulado),
- * ligado a la descarga efectiva de los sprites del vehículo objetivo. La
- * calidad de conexión decide cuánto se espera aquí antes de considerar la
- * carga lista (readyThresholdForTier) — el resto sigue cargando en segundo
- * plano de forma transparente dentro del visualizador. Al llegar a ese punto
- * el porcentaje se muestra como 100% y aparece el botón "Ingresar": la
- * entrada al showroom es MANUAL (clic del usuario), no automática.
+ * Ver docs/APP-FLOW.md §3.1 y docs/TRD.md §4.2. Progreso REAL (no simulado):
+ * el 100% exige que TODO lo visible al entrar esté descargado —
+ * 1) los 36 frames de TODOS los colores del vehículo inicial, hasta la
+ *    calidad que dicta la velocidad de conexión (readyThresholdForTier);
+ *    las calidades superiores siguen cargando en segundo plano dentro del
+ *    visualizador, de forma transparente;
+ * 2) los assets estáticos: la imagen de la card de CADA vehículo del
+ *    catálogo, los íconos (cards + puntos de interés) y los backgrounds de
+ *    escena (claro/oscuro y "propio").
+ * Recién al llegar a 100% aparece el botón "Ingresar": la entrada al
+ * showroom es MANUAL (clic del usuario), no automática.
  */
-export function LoadingScreen({ cacheKey, spriteSets, onReady }: LoadingScreenProps) {
+export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
   // Se mide el throughput real descargando el primer frame en baja calidad.
-  const sampleUrl = spriteSets.find((s) => s.quality === "low")?.frameUrl(1);
+  const sampleUrl = vehicle.variants[0]?.exteriorSprites
+    .find((s) => s.quality === "low")
+    ?.frameUrl(1);
   const tier = useConnectionTier(sampleUrl);
-  const { bestQuality, progress } = useSpriteQuality(cacheKey, spriteSets);
-  const [isReady, setIsReady] = useState(false);
-
   const threshold = readyThresholdForTier(tier);
 
-  useEffect(() => {
-    if (isReady) return;
-    if (qualityIndex(bestQuality) >= qualityIndex(threshold)) {
-      setIsReady(true);
-    }
-  }, [bestQuality, threshold, isReady]);
+  const staticAssets = useMemo(() => getPreloadAssetUrls(), []);
+  const [staticLoaded, setStaticLoaded] = useState(0);
+  const [staticDone, setStaticDone] = useState(false);
+  const [spriteLoaded, setSpriteLoaded] = useState(0);
+  const [spritesDone, setSpritesDone] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  // El 100% queda reservado para el estado "listo": mientras no se alcance
-  // el umbral, el porcentaje real se topa en 99 para que el 100% y el botón
-  // aparezcan siempre juntos.
-  const percent = isReady ? 100 : Math.min(99, Math.round(progress * 100));
+  // Total de frames objetivo con el umbral vigente: todas las variantes,
+  // calidades low..threshold. Si la medición de velocidad sube el umbral a
+  // mitad de carga, el total crece y el porcentaje se recalcula solo.
+  const spriteTotal = useMemo(() => {
+    const allowed = new Set(QUALITIES.slice(0, QUALITIES.indexOf(threshold) + 1));
+    return vehicle.variants.reduce(
+      (sum, v) => sum + v.exteriorSprites.filter((s) => allowed.has(s.quality)).length * FRAME_COUNT,
+      0
+    );
+  }, [vehicle, threshold]);
+
+  useEffect(() => {
+    let cancelled = false;
+    preloadStaticAssets(staticAssets, (loaded) => {
+      if (!cancelled) setStaticLoaded(loaded);
+    }).then(() => {
+      if (!cancelled) setStaticDone(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [staticAssets]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSpritesDone(false);
+    // Cada variante reporta su progreso propio y acá se agrega la suma. La
+    // carga es SECUENCIAL y en orden: el color por defecto (variants[0])
+    // primero — es el que se ve al entrar — y después el resto de colores.
+    const perVariant = new Map<string, number>();
+    const report = () => {
+      if (cancelled) return;
+      let sum = 0;
+      perVariant.forEach((n) => {
+        sum += n;
+      });
+      setSpriteLoaded(sum);
+    };
+    (async () => {
+      for (const v of vehicle.variants) {
+        if (cancelled) return;
+        await loadSpriteSetsUpTo(
+          spriteCacheKey(vehicle.slug, v.id),
+          v.exteriorSprites,
+          threshold,
+          (loaded) => {
+            perVariant.set(v.id, loaded);
+            report();
+          }
+        );
+      }
+      if (!cancelled) setSpritesDone(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicle, threshold]);
+
+  // isReady es un latch: una vez alcanzado el 100% no se retrocede aunque el
+  // umbral de conexión cambie después.
+  useEffect(() => {
+    if (!isReady && spritesDone && staticDone) setIsReady(true);
+  }, [spritesDone, staticDone, isReady]);
+
+  // El 100% queda reservado para el estado "listo": mientras falte CUALQUIER
+  // asset (sprites de algún color, cards, íconos o backgrounds), el
+  // porcentaje real se topa en 99 para que el 100% y el botón aparezcan
+  // siempre juntos.
+  const total = spriteTotal + staticAssets.length;
+  const loaded = spriteLoaded + staticLoaded;
+  const percent = isReady ? 100 : total === 0 ? 99 : Math.min(99, Math.round((loaded / total) * 100));
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-[#F4F6F9] px-6 text-center">

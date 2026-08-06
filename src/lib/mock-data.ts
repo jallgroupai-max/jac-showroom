@@ -303,3 +303,31 @@ export function isVehicleAvailable(vehicle: Vehicle): boolean {
 export function getVehiclesByCategory(categorySlug: string): Vehicle[] {
   return VEHICLES.filter((v) => v.categorySlug === categorySlug).sort((a, b) => a.order - b.order);
 }
+
+/** URL de un ícono suelto de recursos/Iconos servido desde /public. */
+export function iconAssetUrl(name: string): string {
+  return `/assets/icons/${name}.svg`;
+}
+
+/**
+ * Assets estáticos que el Loading inicial debe dejar descargados antes de
+ * llegar al 100% (además de los sprites del vehículo inicial): la imagen de
+ * la card de CADA vehículo del catálogo, los íconos (tipos de vehículo y
+ * puntos de interés), los backgrounds de escena (claro/oscuro y "propio") y
+ * la silueta de no-disponible. Deduplicado — varios vehículos comparten
+ * íconos y background.
+ */
+export function getPreloadAssetUrls(): string[] {
+  const urls = new Set<string>();
+  for (const v of VEHICLES) {
+    urls.add(v.cardImageUrl ?? v.variants[0].thumbnailUrl);
+    for (const icon of v.featureIcons) urls.add(iconAssetUrl(icon));
+    for (const poi of v.pointsOfInterest) urls.add(iconAssetUrl(poi.icon));
+    urls.add(v.ownBackgroundUrl);
+  }
+  for (const scene of SCENES) {
+    if (scene.imageUrl) urls.add(scene.imageUrl);
+  }
+  urls.add(UNAVAILABLE_VEHICLE_IMAGE);
+  return [...urls];
+}

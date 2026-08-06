@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import type { Category, Vehicle } from "@/lib/types";
+import { iconAssetUrl } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 interface CatalogPanelProps {
@@ -215,7 +216,7 @@ export function CatalogPanel({
                         // eslint-disable-next-line @next/next/no-img-element -- ícono SVG suelto de recursos/Iconos
                         <img
                           key={icon}
-                          src={`/assets/icons/${icon}.svg`}
+                          src={iconAssetUrl(icon)}
                           alt=""
                           aria-hidden
                           className="h-13 w-13"

@@ -6,7 +6,7 @@ import { QUALITIES } from "./types";
 // al volver a ellos dentro de la misma sesión. Vive en scope de módulo (no en
 // estado de React) para sobrevivir a remounts de componentes en la SPA.
 
-const FRAME_COUNT = 36;
+export const FRAME_COUNT = 36;
 
 interface CacheEntry {
   loadedQualities: Set<Quality>;
@@ -102,6 +102,67 @@ export async function loadSpriteSetsProgressively(
     });
     onQualityComplete?.(set.quality);
   }
+}
+
+/**
+ * Carga los sets de un color SOLO hasta `maxQuality` (incluida), siempre en
+ * orden low -> medium -> high. Es la carga del Loading inicial: el umbral lo
+ * decide la velocidad de conexión (readyThresholdForTier) y las calidades
+ * superiores quedan para el segundo plano dentro del visualizador.
+ * onProgress reporta (framesLoaded, framesTotal) del objetivo acotado.
+ */
+export async function loadSpriteSetsUpTo(
+  key: string,
+  spriteSets: SpriteSet[],
+  maxQuality: Quality,
+  onProgress?: (loaded: number, total: number) => void
+): Promise<void> {
+  const ordered = QUALITIES.slice(0, QUALITIES.indexOf(maxQuality) + 1)
+    .map((q) => spriteSets.find((s) => s.quality === q))
+    .filter((s): s is SpriteSet => Boolean(s));
+  const total = ordered.length * FRAME_COUNT;
+  let loaded = 0;
+  onProgress?.(0, total);
+  for (let i = 0; i < ordered.length; i++) {
+    const set = ordered[i];
+    if (!isQualityCached(key, set.quality)) {
+      await preloadQuality(key, set, () => {
+        loaded++;
+        onProgress?.(loaded, total);
+      });
+    }
+    // Ajuste exacto al cierre de cada calidad: si la descarga real la hizo
+    // otra invocación concurrente (dedup de loadingPromises), los onFrame no
+    // llegan a este llamador — el conteo se corrige al valor cierto.
+    loaded = (i + 1) * FRAME_COUNT;
+    onProgress?.(loaded, total);
+  }
+}
+
+/**
+ * Precarga una lista de imágenes sueltas (cards del catálogo, íconos,
+ * backgrounds de escena) con tope de concurrencia. Un asset que falla no
+ * bloquea: cuenta como cargado (mismo criterio que preloadImage — nunca
+ * romper la experiencia). onProgress reporta (loaded, total).
+ */
+export async function preloadStaticAssets(
+  urls: string[],
+  onProgress?: (loaded: number, total: number) => void
+): Promise<void> {
+  const CONCURRENCY = 6;
+  const total = urls.length;
+  let cursor = 0;
+  let loaded = 0;
+  onProgress?.(0, total);
+  async function worker() {
+    while (cursor < urls.length) {
+      const url = urls[cursor++];
+      await preloadImage(url);
+      loaded++;
+      onProgress?.(loaded, total);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, Math.max(1, total)) }, () => worker()));
 }
 
 export function spriteCacheKey(vehicleSlug: string, variantOrMode: string): string {

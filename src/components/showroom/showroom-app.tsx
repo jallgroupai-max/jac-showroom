@@ -161,13 +161,10 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   }
 
   if (phase === "loading") {
-    return (
-      <LoadingScreen
-        cacheKey={spriteCacheKey(startVehicle.slug, startVehicle.variants[0].id)}
-        spriteSets={startVehicle.variants[0].exteriorSprites}
-        onReady={() => setPhase("app")}
-      />
-    );
+    // El Loading precarga TODOS los colores del vehículo inicial (hasta la
+    // calidad que dicte la conexión) más cards/íconos/backgrounds — ver
+    // loading-screen.tsx.
+    return <LoadingScreen vehicle={startVehicle} onReady={() => setPhase("app")} />;
   }
 
   return (
