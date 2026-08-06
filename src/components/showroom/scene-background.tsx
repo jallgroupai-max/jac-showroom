@@ -19,7 +19,15 @@ interface SceneBackgroundProps {
 export function SceneBackground({ imageUrl, color }: SceneBackgroundProps) {
   const key = color ?? imageUrl;
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    // La capa del fondo termina un 10% por ENCIMA del borde inferior
+    // (bottom-[10%]): la escena queda con un margen inferior respecto al
+    // viewport, acompañando al vehículo que se apoya a esa misma altura
+    // (ver sprite-viewer.tsx). La máscara desvanece el borde inferior del
+    // fondo hacia transparente (del 75% de la altura hacia abajo): la escena
+    // se funde con el fondo claro de la página en vez de cortarse con una
+    // línea dura — aplica en mobile y desktop por igual, y solo al fondo
+    // (el vehículo no se toca).
+    <div className="absolute inset-x-0 top-0 bottom-[10%] overflow-hidden [-webkit-mask-image:linear-gradient(to_bottom,#000_75%,transparent_100%)] [mask-image:linear-gradient(to_bottom,#000_75%,transparent_100%)]">
       <AnimatePresence>
         {color ? (
           <motion.div
@@ -38,12 +46,11 @@ export function SceneBackground({ imageUrl, color }: SceneBackgroundProps) {
             src={imageUrl}
             alt=""
             aria-hidden
-            // object-bottom: el recorte de object-cover se ancla al borde
-            // inferior de la foto — la escena "sube" (más piso visible abajo,
-            // pared/logo más arriba) acompañando al vehículo, que se apoya un
-            // 10% por encima del borde inferior (ver sprite-viewer.tsx). Sin
-            // franjas vacías: el cover siempre llena el contenedor.
-            className="absolute inset-0 h-full w-full object-cover object-bottom"
+            // object-center: la foto queda CENTRADA dentro de la capa del
+            // fondo (que ya termina un 10% sobre el borde inferior, ver el
+            // contenedor). Sin franjas vacías: el cover siempre llena el
+            // contenedor.
+            className="absolute inset-0 h-full w-full object-cover object-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

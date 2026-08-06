@@ -50,7 +50,10 @@ export function CatalogPanel({
   onConfirmVehicle,
 }: CatalogPanelProps) {
   const activeIndex = Math.max(0, vehicles.findIndex((v) => v.slug === activeVehicleSlug));
-  const repeatCount = vehicles.length > 1 ? Math.max(2, Math.ceil(MIN_LOOP_SLIDES / vehicles.length)) : 1;
+  // También con UN solo vehículo se repite el set (antes quedaba una única
+  // tarjeta centrada con los lados vacíos): el carrusel debe mostrar SIEMPRE
+  // al menos 3 tarjetas visibles, aunque sean copias del mismo vehículo.
+  const repeatCount = vehicles.length === 0 ? 0 : Math.max(2, Math.ceil(MIN_LOOP_SLIDES / vehicles.length));
   const loopVehicles = Array.from({ length: repeatCount }, () => vehicles).flat();
 
   // startIndex capturado UNA sola vez (al montar): si se recalculara con cada
@@ -118,18 +121,23 @@ export function CatalogPanel({
           del ancho del carrusel (1160px) con el título a la IZQUIERDA y las
           pestañas de categoría centradas, ambos a la misma altura. */}
       <div className="flex w-full flex-col items-center gap-5 lg:relative lg:mx-auto lg:w-[1160px] lg:max-w-full lg:flex-row lg:justify-center lg:gap-0">
-        <h2 className="text-xl font-extrabold text-[#12141A] sm:text-2xl lg:absolute lg:left-3 lg:top-1/2 lg:-translate-y-1/2">
+        {/* Título más grande en mobile/tablet; en desktop conserva su
+            tamaño original (text-2xl) y su posición absoluta a la izquierda. */}
+        <h2 className="text-2xl font-extrabold text-[#12141A] sm:text-3xl lg:absolute lg:left-3 lg:top-1/2 lg:-translate-y-1/2 lg:text-2xl">
           Selecciona tu vehículo
         </h2>
 
-        <div className="flex items-center gap-1 rounded-full bg-white p-1 shadow-sm">
+        {/* Pestañas de categoría: en mobile/tablet ocupan el 90% del ancho
+            centradas (los botones se reparten el espacio en partes iguales);
+            en desktop vuelven a ajustarse a su contenido. */}
+        <div className="flex w-[90%] items-center gap-1 rounded-full bg-white p-1 shadow-sm lg:w-auto">
         {categories.map((c) => (
           <button
             key={c.slug}
             type="button"
             onClick={() => onCategoryChange(c.slug)}
             className={cn(
-              "rounded-full px-4 py-2 text-sm font-semibold transition-colors sm:px-5",
+              "flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors sm:px-5 lg:flex-none",
               c.slug === activeCategorySlug ? "bg-[#111318] text-white" : "text-[#6B7280] hover:text-[#12141A]"
             )}
           >
@@ -151,16 +159,22 @@ export function CatalogPanel({
             className="h-full w-full cursor-grab overflow-hidden active:cursor-grabbing lg:mx-auto lg:w-[1160px] lg:max-w-full"
             ref={emblaRef}
           >
-            <div className="flex h-full items-center gap-3 lg:gap-0">
+            <div className="flex h-full items-center">
               {loopVehicles.map((v, i) => {
                 // Posicional, no por slug: solo la copia centrada se pinta.
                 const isActive = i === centeredIndex;
                 return (
-                  // Slide: ancho fijo en mobile; en desktop 232px (tarjeta
-                  // CUADRADA de 220 + 12 de separación interna).
+                  // Slide: la separación entre tarjetas se hace con padding
+                  // (no con `gap` del contenedor) — Embla mide el ancho de
+                  // cada slide por su propio bounding box, y con loop:true
+                  // el "gap" del contenedor flex no se replica en la costura
+                  // donde el carrusel envuelve del último slide al primero,
+                  // dejando ese punto sin separación. El padding sí queda
+                  // dentro del propio slide y viaja con él. basis = ancho de
+                  // tarjeta + padding (ej. mobile 174 = 150 + 24 de gap).
                   <div
                     key={`${v.slug}-${i}`}
-                    className="flex min-w-0 shrink-0 grow-0 basis-[190px] sm:basis-[220px] lg:basis-[232px] lg:px-1.5"
+                    className="flex min-w-0 shrink-0 grow-0 basis-[174px] px-3 sm:basis-[236px] sm:px-2 lg:basis-[232px] lg:px-1.5"
                   >
                   <button
                     type="button"
@@ -169,7 +183,7 @@ export function CatalogPanel({
                     // vehículo — el doble clic solo confirma y cierra.
                     onDoubleClick={onConfirmVehicle}
                     className={cn(
-                      "relative flex h-[180px] w-full flex-col justify-between overflow-hidden rounded-2xl p-4 text-left transition-colors duration-300",
+                      "relative flex h-[230px] w-full flex-col justify-between overflow-hidden rounded-2xl p-4 text-left transition-colors duration-300 sm:h-[180px] lg:h-[180px]",
                       isActive ? "bg-[#5D95B7] text-white" : "bg-[#FBFBFB] text-[#12141A]"
                     )}
                   >

@@ -244,20 +244,8 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
         )}
       </div>
 
-      {/* Hint de rotación — en mobile/tablet vive suelto, centrado, justo
-          debajo del héroe (visible tanto en catálogo como en visualizador);
-          en desktop sigue agrupado con el toolbar de POI, más abajo. */}
-      <div className="flex shrink-0 justify-center px-4 pt-3 mb-2 lg:hidden">
-        <div
-          className={cn(
-            "pointer-events-none rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm",
-            !hasRotated && "animate-pulse"
-          )}
-        >
-          Haz clic y arrastra para rotar{" "}
-          <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
-        </div>
-      </div>
+      {/* El hint de "arrastra para rotar" NO existe en mobile/tablet (pedido
+          explícito) — solo en desktop, agrupado con el toolbar de POI. */}
 
       {/* Controles: fila normal debajo del héroe en mobile/tablet;
           overlay absoluto flotando sobre el héroe desde desktop (lg:). */}
@@ -324,14 +312,16 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
         </AnimatePresence>
       </div>
 
-      {/* CTA persistente — en mobile/tablet vive en su propia barra, en
-          flujo normal, justo debajo del contenedor de catálogo/controles
-          (docs/UX-UI-BRIEF.md §7); en desktop sigue en el header. */}
-      <div className="relative shrink-0 border-t border-black/5 bg-white p-3 lg:hidden">
+      {/* CTA persistente — en mobile/tablet vive en flujo normal, justo
+          debajo del contenedor de catálogo/controles (docs/UX-UI-BRIEF.md
+          §7); en desktop sigue en el header. Botón centrado al 90% del
+          ancho, sin barra blanca ni borde (se funde con el fondo de la
+          página, fiel al Figma mobile). */}
+      <div className="relative flex shrink-0 justify-center p-3 lg:hidden">
         <button
           type="button"
           onClick={() => setLeadFormOpen(true)}
-          className="w-full rounded-full bg-[#111318] py-3.5 text-sm font-semibold text-white transition-transform active:scale-95"
+          className="w-[90%] rounded-full bg-[#111318] py-3.5 text-sm font-semibold text-white transition-transform active:scale-95"
         >
           Me Interesa
         </button>

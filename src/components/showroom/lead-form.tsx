@@ -67,7 +67,22 @@ export function LeadForm({ vehicle, variant, open, onOpenChange, onSuccess }: Le
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-3xl p-6">
+      <DialogContent
+        className={cn(
+          // Desktop (≥lg): modal centrado, sin cambios respecto a antes.
+          "lg:top-1/2 lg:left-1/2 lg:max-w-md lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-3xl lg:p-6",
+          // Mobile/tablet (<lg): hoja a pantalla completa (100% ancho y
+          // alto), con scroll propio si el formulario no entra, más padding
+          // lateral que el de desktop y sin esquinas redondeadas (ocupa todo
+          // el borde de la pantalla).
+          "max-lg:fixed max-lg:inset-0 max-lg:h-dvh max-lg:w-screen max-lg:max-w-none max-lg:translate-x-0 max-lg:translate-y-0 max-lg:overflow-y-auto max-lg:rounded-none max-lg:px-8 max-lg:py-6",
+          // Animación: el zoom-in/zoom-out base queda solo para desktop; en
+          // mobile se reemplaza por un slide desde abajo hacia arriba (fiel
+          // al gesto típico de un formulario deslizándose en apps mobile).
+          "data-open:zoom-in-100 data-closed:zoom-out-100 lg:data-open:zoom-in-95 lg:data-closed:zoom-out-95",
+          "max-lg:data-open:slide-in-from-bottom max-lg:data-closed:slide-out-to-bottom max-lg:duration-300"
+        )}
+      >
         <DialogHeader className="text-left">
           <DialogTitle className="text-xl font-extrabold text-[#12141A]">Me interesa este vehículo</DialogTitle>
           <p className="text-sm text-[#6B7280]">
@@ -112,18 +127,6 @@ export function LeadForm({ vehicle, variant, open, onOpenChange, onSuccess }: Le
               onChange={(e) => setEmail(e.target.value)}
               className="bg-[#F4F6F9]"
             />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="dealer">Ciudad / Concesionario</Label>
-            <select
-              id="dealer"
-              disabled
-              value={DEALERS[0].id}
-              className="h-9 rounded-md border border-input bg-[#F4F6F9] px-3 text-sm text-[#12141A] disabled:opacity-100"
-            >
-              <option value={DEALERS[0].id}>{DEALERS[0].city}</option>
-            </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
