@@ -202,7 +202,7 @@ export function SpriteViewer({
               framer-motion pisa el transform de los elementos que anima. */}
           <div className="flex h-full w-full origin-bottom scale-[1.25] items-end justify-center lg:scale-100">
           {unavailable ? (
-            <div className="relative flex h-[90%] max-w-[100%] translate-y-[6%] items-center justify-center lg:h-full lg:max-w-[82%]">
+            <div className="relative flex h-[70%] max-w-[100%] translate-y-[6%] items-center justify-center lg:h-full lg:max-w-[82%]">
               {/* eslint-disable-next-line @next/next/no-img-element -- silueta compartida servida directo */}
               <img
                 src={UNAVAILABLE_VEHICLE_IMAGE}
@@ -234,7 +234,7 @@ export function SpriteViewer({
                   onAnimationComplete={() => {
                     if (wipe.phase === "fade") setWipe(null);
                   }}
-                  className="pointer-events-none h-[90%] max-w-[100%] object-contain drop-shadow-2xl lg:h-full lg:max-w-[82%]"
+                  className="pointer-events-none h-[70%] max-w-[100%] object-contain drop-shadow-2xl lg:h-full lg:max-w-[82%]"
                 />
                 {/* El color nuevo entra con barrido + fade 0 -> 1 sobre la
                     capa saliente: la zona ya barrida se va solidificando
@@ -255,7 +255,7 @@ export function SpriteViewer({
                   onAnimationComplete={() => {
                     if (wipe.phase === "sweep") setWipe((w) => (w ? { ...w, phase: "fade" } : w));
                   }}
-                  className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-[90%] max-w-[100%] object-contain drop-shadow-2xl lg:h-full lg:max-w-[82%]"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-[70%] max-w-[100%] object-contain drop-shadow-2xl lg:h-full lg:max-w-[82%]"
                 />
               </>
             ) : (
@@ -265,7 +265,7 @@ export function SpriteViewer({
               // re-decodificar la imagen en cada frame, y ese lag hacía que
               // el 360 se sintiera pegado y luego saltara varios frames de
               // golpe al ponerse al día.
-              <div className="pointer-events-none relative h-[90%] max-w-[100%] drop-shadow-2xl lg:h-full lg:max-w-[82%]">
+              <div className="pointer-events-none relative h-[70%] max-w-[100%] drop-shadow-2xl lg:h-full lg:max-w-[82%]">
                 {Array.from({ length: FRAME_COUNT }, (_, i) => i + 1).map((n) => (
                   // eslint-disable-next-line @next/next/no-img-element -- secuencia de frames servida directo, no encaja con next/image
                   <img
