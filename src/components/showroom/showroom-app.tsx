@@ -232,6 +232,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             vehicleKey={vehicle.slug}
             spriteSets={spriteSets}
             panoramaUrl={interiorImageUrl}
+            onClosePanorama={() => setViewMode("exterior")}
             backgroundUrl={backgroundUrl}
             backgroundColor={backgroundColor}
             isFullscreen={isFullscreen}

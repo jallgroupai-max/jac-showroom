@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Minus, Plus, RotateCcw, RotateCw } from "lucide-react";
+import { Minus, Plus, RotateCcw, RotateCw, X } from "lucide-react";
 import type { SpriteSet } from "@/lib/types";
 import { UNAVAILABLE_VEHICLE_IMAGE } from "@/lib/mock-data";
 import { FRAME_COUNT, warmDecodedFrames } from "@/lib/sprite-cache";
@@ -24,6 +24,8 @@ interface SpriteViewerProps {
    * fondo de escena y el vehículo se RETIRAN y en su lugar el visor
    * panorámico (Photo Sphere Viewer) ocupa el espacio del fondo. */
   panoramaUrl?: string;
+  /** Cierra la vista interior (botón "Cerrar" flotante, solo desktop). */
+  onClosePanorama?: () => void;
   /** Alternativa a `backgroundColor` — foto de escena. */
   backgroundUrl?: string;
   /** Alternativa a `backgroundUrl` — fondo de color sólido. */
@@ -59,6 +61,7 @@ export function SpriteViewer({
   vehicleKey,
   spriteSets,
   panoramaUrl,
+  onClosePanorama,
   backgroundUrl,
   backgroundColor,
   className,
@@ -173,6 +176,19 @@ export function SpriteViewer({
         <div className="absolute inset-x-0 top-0 bottom-[25%] overflow-hidden">
           <InteriorPanorama imageUrl={panoramaUrl} />
         </div>
+
+        {/* "Cerrar" flotante (solo DESKTOP): pastilla negra como el resto de
+            los CTA, con la X a la IZQUIERDA del texto. Semitransparente en
+            reposo y opaca al pasar el mouse. Vuelve a la vista Exterior. */}
+        {onClosePanorama && (
+          <button
+            type="button"
+            onClick={onClosePanorama}
+            className="absolute left-1/2 top-6 z-20 hidden -translate-x-1/2 cursor-pointer items-center gap-2 rounded-full bg-[#111318] px-5 py-2.5 text-sm font-semibold text-white opacity-50 shadow-lg transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none lg:flex"
+          >
+            <X className="h-4 w-4" /> Cerrar
+          </button>
+        )}
       </div>
     );
   }
