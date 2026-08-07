@@ -8,17 +8,11 @@ interface LeadConfirmationProps {
   variant: VehicleVariant;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  whatsappNumber?: string;
 }
 
-/** Pantalla de confirmación — capturada en la conversación. */
-export function LeadConfirmation({ vehicle, variant, open, onOpenChange, whatsappNumber }: LeadConfirmationProps) {
-  const message = encodeURIComponent(
-    `Hola, escribo por el ${vehicle.commercialName} (${vehicle.technicalName}) en color ${variant.colorName}.`
-  );
-  // ⚠️ Número de WhatsApp de negocio pendiente (docs/TRD.md §6.3) — placeholder.
-  const waHref = `https://wa.me/${whatsappNumber ?? "000000000000"}?text=${message}`;
-
+/** Pantalla de confirmación — capturada en la conversación. Sin CTA de
+ * WhatsApp (retirado a pedido): el contacto lo inicia el asesor. */
+export function LeadConfirmation({ vehicle, variant, open, onOpenChange }: LeadConfirmationProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm rounded-3xl p-8 text-center">
@@ -43,14 +37,6 @@ export function LeadConfirmation({ vehicle, variant, open, onOpenChange, whatsap
         >
           Volver al showroom
         </button>
-        <a
-          href={waHref}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 inline-block text-sm font-semibold text-[#25D366]"
-        >
-          Escríbenos ahora por WhatsApp →
-        </a>
       </DialogContent>
     </Dialog>
   );
