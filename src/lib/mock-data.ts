@@ -321,6 +321,11 @@ export function getPreloadAssetUrls(): string[] {
   const urls = new Set<string>();
   for (const v of VEHICLES) {
     urls.add(v.cardImageUrl ?? v.variants[0].thumbnailUrl);
+    // Miniaturas del selector de colores (frame 25 del set LOW de cada
+    // color): el Loading ya no descarga los sets low cuando el umbral de
+    // conexión es superior, así que se precargan acá EXPLÍCITAMENTE — los
+    // botones de color deben aparecer siempre, todos y de inmediato.
+    for (const variant of v.variants) urls.add(variant.thumbnailUrl);
     for (const icon of v.featureIcons) urls.add(iconAssetUrl(icon));
     for (const poi of v.pointsOfInterest) urls.add(iconAssetUrl(poi.icon));
     urls.add(v.ownBackgroundUrl);
