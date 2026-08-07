@@ -24,6 +24,21 @@ export function useSpriteQuality(cacheKey: string, spriteSets: SpriteSet[]): Use
   const [bestQuality, setBestQuality] = useState<Quality | null>(() => highestCachedQuality(cacheKey));
   const [progress, setProgress] = useState(() => (highestCachedQuality(cacheKey) ? 1 : 0));
 
+  // Reset SINCRÓNICO al cambiar de set (patrón React "derive state during
+  // render", sin render intermedio con datos viejos): bestQuality es
+  // monótona-creciente DENTRO de un mismo set, pero al cambiar de
+  // color/vehículo debe re-partir de lo realmente cacheado del set NUEVO.
+  // Arrastrar la calidad del set anterior hacía que activeSet apuntara a
+  // frames aún no descargados: el vehículo desaparecía al cambiar de color y
+  // el giro quedaba pegado/saltando entre los pocos frames ya bajados.
+  const [prevKey, setPrevKey] = useState(cacheKey);
+  if (prevKey !== cacheKey) {
+    setPrevKey(cacheKey);
+    const cached = highestCachedQuality(cacheKey);
+    setBestQuality(cached);
+    setProgress(cached ? 1 : 0);
+  }
+
   // Se llama en cada montaje/cambio de cacheKey (incluido el doble-invocado de
   // efectos de React StrictMode en desarrollo). Es seguro e idempotente: la
   // deduplicación real vive en sprite-cache.ts (loadingPromises/loadedQualities),

@@ -7,6 +7,7 @@ import { readyThresholdForTier, useConnectionTier } from "@/lib/connection";
 import { getPreloadAssetUrls } from "@/lib/mock-data";
 import {
   FRAME_COUNT,
+  loadSpriteSetsProgressively,
   loadSpriteSetsUpTo,
   preloadStaticAssets,
   spriteCacheKey,
@@ -109,6 +110,19 @@ export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
   useEffect(() => {
     if (!isReady && spritesDone && staticDone) setIsReady(true);
   }, [spritesDone, staticDone, isReady]);
+
+  // Con el 100% alcanzado, las calidades que quedaron POR ENCIMA del umbral
+  // siguen bajando en segundo plano para TODOS los colores (0001..0036 de
+  // cada uno) — así el cambio de color dentro del visualizador tampoco
+  // espera por las calidades altas. La carga vive en sprite-cache (scope de
+  // módulo): sobrevive al desmontaje de esta pantalla cuando el usuario
+  // entra, y el dedup del caché evita repetir lo ya descargado.
+  useEffect(() => {
+    if (!isReady) return;
+    for (const v of vehicle.variants) {
+      loadSpriteSetsProgressively(spriteCacheKey(vehicle.slug, v.id), v.exteriorSprites);
+    }
+  }, [isReady, vehicle]);
 
   // El 100% queda reservado para el estado "listo": mientras falte CUALQUIER
   // asset (sprites de algún color, cards, íconos o backgrounds), el
