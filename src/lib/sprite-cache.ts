@@ -24,9 +24,28 @@ function getEntry(key: string): CacheEntry {
   return entry;
 }
 
+// Toda imagen precargada queda RETENIDA aquí de por vida de la sesión. Sin
+// una referencia viva, el navegador puede soltar el recurso de su caché en
+// memoria y cada <img> que después usa la misma URL vuelve a la red (o a
+// revalidar — los assets de /public se sirven con revalidación): por eso las
+// cards del catálogo, los thumbnails de color y los backgrounds aparecían de
+// a poco en runtime pese a la precarga del Loading. Con la referencia viva,
+// el recurso se reutiliza al instante.
+const retainedImages = new Map<string, HTMLImageElement>();
+
 function preloadImage(url: string): Promise<void> {
   return new Promise((resolve) => {
+    const existing = retainedImages.get(url);
+    if (existing) {
+      if (existing.complete) return resolve();
+      // addEventListener (no onload=): la promesa original del mismo recurso
+      // conserva sus propios handlers — nadie pisa a nadie.
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => resolve(), { once: true });
+      return;
+    }
     const img = new window.Image();
+    retainedImages.set(url, img);
     img.onload = () => resolve();
     // Nunca romper la experiencia: un frame que falla no bloquea el resto.
     img.onerror = () => resolve();
@@ -192,8 +211,15 @@ export function warmDecodedFrames(setKey: string, spriteSet: SpriteSet): void {
     warmSets.delete(oldest);
   }
   for (let frame = 1; frame <= FRAME_COUNT; frame++) {
-    const img = new window.Image();
-    img.src = spriteSet.frameUrl(frame);
+    const url = spriteSet.frameUrl(frame);
+    // Reutiliza la imagen ya retenida por la precarga (mismo recurso vivo,
+    // sin nueva petición); si no existe, se crea y retiene acá mismo.
+    let img = retainedImages.get(url);
+    if (!img) {
+      img = new window.Image();
+      img.src = url;
+      retainedImages.set(url, img);
+    }
     // decode() rechaza p. ej. ante un 404 — nunca romper la experiencia.
     img.decode().catch(() => {});
     imgs.push(img);
