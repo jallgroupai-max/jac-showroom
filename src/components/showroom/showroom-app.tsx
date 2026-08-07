@@ -247,22 +247,25 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             onFirstRotate={() => setHasRotated(true)}
           />
 
-          {/* Botón circular de INGRESO flotando encima del carro — visible
-              solo con el selector de vehículos abierto y vehículo
-              disponible (reemplaza al ícono que vivía en la card). Viaja
-              con el héroe cuando este se desplaza en desktop. */}
+          {/* Botón de INGRESO flotando encima del carro — visible solo con
+              el selector de vehículos abierto y vehículo disponible
+              (reemplaza al ícono que vivía en la card). Viaja con el héroe
+              cuando este se desplaza en desktop. En MOBILE es una pastilla
+              más grande con el texto "Ver vehículo"; en desktop conserva el
+              círculo con solo el ícono. */}
           {subPhase === "catalog" && isVehicleAvailable(vehicle) && (
             <button
               type="button"
-              aria-label="Ingresar al vehículo"
-              title="Ingresar"
+              aria-label="Ver vehículo"
+              title="Ver vehículo"
               onClick={(e) => {
                 e.stopPropagation();
                 confirmVehicle();
               }}
-              className="absolute left-1/2 top-[42%] z-20 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-[#12141A] shadow-lg backdrop-blur transition-transform hover:scale-110"
+              className="absolute left-1/2 top-[42%] z-20 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2.5 rounded-full bg-white/90 px-6 py-3.5 text-sm font-semibold text-[#12141A] shadow-lg backdrop-blur transition-transform hover:scale-110 lg:h-14 lg:w-14 lg:justify-center lg:gap-0 lg:px-0 lg:py-0"
             >
-              <EnterVehicleIcon className="h-8 w-8" />
+              <EnterVehicleIcon className="h-9 w-9 lg:h-8 lg:w-8" />
+              <span className="lg:hidden">Ver vehículo</span>
             </button>
           )}
         </motion.div>
@@ -349,7 +352,13 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
                 customScenes={CUSTOM_SCENES}
                 activeSceneId={sceneId}
                 onSceneChange={setSceneId}
-                onChangeVehicle={() => setSubPhase("catalog")}
+                // Al abrir el selector de vehículos SIEMPRE se vuelve a
+                // Exterior: si quedaba activo el 360 interior, el panorama
+                // seguía montado tapando la previsualización del catálogo.
+                onChangeVehicle={() => {
+                  setViewMode("exterior");
+                  setSubPhase("catalog");
+                }}
               />
             </motion.div>
           )}
