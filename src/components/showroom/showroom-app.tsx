@@ -317,20 +317,22 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
         </AnimatePresence>
       </div>
 
-      {/* CTA persistente — en mobile/tablet vive en flujo normal, justo
-          debajo del contenedor de catálogo/controles (docs/UX-UI-BRIEF.md
-          §7); en desktop sigue en el header. Botón centrado al 90% del
+      {/* CTA en mobile/tablet — SOLO visible dentro del visualizador (con
+          los controles de color/escena); en el selector de catálogo no
+          aparece. En desktop sigue en el header. Botón centrado al 90% del
           ancho, sin barra blanca ni borde (se funde con el fondo de la
           página, fiel al Figma mobile). */}
-      <div className="relative flex shrink-0 justify-center p-3 lg:hidden">
-        <button
-          type="button"
-          onClick={() => setLeadFormOpen(true)}
-          className="w-[90%] rounded-full bg-[#111318] py-3.5 text-sm font-semibold text-white transition-transform active:scale-95"
-        >
-          Me Interesa
-        </button>
-      </div>
+      {subPhase === "visualizer" && (
+        <div className="relative flex shrink-0 justify-center p-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setLeadFormOpen(true)}
+            className="w-[90%] rounded-full bg-[#111318] py-3.5 text-sm font-semibold text-white transition-transform active:scale-95"
+          >
+            Me Interesa
+          </button>
+        </div>
+      )}
 
       <SpecsPanel vehicle={vehicle} open={specsOpen} onOpenChange={setSpecsOpen} />
 

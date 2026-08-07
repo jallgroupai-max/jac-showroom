@@ -154,11 +154,19 @@ function CategoryCarousel({
 
   // Índice del slide CENTRADO (snap seleccionado de Embla) — es quien manda
   // sobre el resaltado azul: se actualiza al clicar (scrollTo), al arrastrar
-  // y al reinicializar, siguiendo siempre a la tarjeta del medio.
+  // y al reinicializar, siguiendo siempre a la tarjeta del medio. La card
+  // que queda ACTIVA además actualiza el vehículo previsualizado en el
+  // héroe (mismo criterio que el carrusel de colores: snap centrado =
+  // selección) — al deslizar, no hace falta tocar la tarjeta.
   const [centeredIndex, setCenteredIndex] = useState(initialIndex);
   useEffect(() => {
     if (!emblaApi) return;
-    const onSelect = () => setCenteredIndex(emblaApi.selectedScrollSnap());
+    const onSelect = () => {
+      const idx = emblaApi.selectedScrollSnap();
+      setCenteredIndex(idx);
+      const centered = loopVehicles[idx];
+      if (centered && centered.slug !== activeVehicleSlug) onSelectVehicle(centered.slug);
+    };
     onSelect();
     emblaApi.on("select", onSelect);
     emblaApi.on("reInit", onSelect);
@@ -166,7 +174,7 @@ function CategoryCarousel({
       emblaApi.off("select", onSelect);
       emblaApi.off("reInit", onSelect);
     };
-  }, [emblaApi]);
+  }, [emblaApi, loopVehicles, activeVehicleSlug, onSelectVehicle]);
 
   const scrollTimerRef = useRef<number | null>(null);
   useEffect(

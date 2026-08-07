@@ -192,6 +192,14 @@ export function SpriteViewer({
             transition={{ duration: 0.4, ease: "easeInOut" }}
             className="absolute inset-x-0 top-0 bottom-[10%] flex items-end justify-center"
           >
+          {/* En mobile el vehículo se AGRANDA con un scale (origen abajo,
+              apoyado en la línea de piso): en pantallas angostas el frame ya
+              toca el 100% del ancho y aumentar solo la altura no lo hacía
+              más grande — el scale sí, a costa de un leve recorte lateral
+              que el héroe (overflow-hidden) absorbe. En desktop queda 1:1.
+              Va en un div PROPIO (no en las capas motion.img del barrido):
+              framer-motion pisa el transform de los elementos que anima. */}
+          <div className="flex h-full w-full origin-bottom scale-[1.25] items-end justify-center lg:scale-100">
           {unavailable ? (
             <div className="relative flex h-[90%] max-w-[100%] translate-y-[6%] items-center justify-center lg:h-full lg:max-w-[82%]">
               {/* eslint-disable-next-line @next/next/no-img-element -- silueta compartida servida directo */}
@@ -282,6 +290,7 @@ export function SpriteViewer({
           ) : (
             <div className="h-16 w-16 animate-pulse rounded-full bg-white/40" aria-hidden />
           )}
+          </div>
           </motion.div>
         </AnimatePresence>
       </motion.div>
