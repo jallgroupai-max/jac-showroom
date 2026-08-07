@@ -133,7 +133,8 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const interiorAvailable = vehicle.interior.sprites.length > 0 || Boolean(vehicle.interior.imageUrl);
   const effectiveViewMode: ViewMode = interiorAvailable ? viewMode : "exterior";
   const spriteSets = effectiveViewMode === "exterior" ? variant.exteriorSprites : vehicle.interior.sprites;
-  // Interior con foto única: el viewer la muestra estática (sin 360°).
+  // Interior con panorámica única: el viewer monta el visor 360°
+  // (Photo Sphere Viewer) en lugar del sprite exterior.
   const interiorImageUrl = effectiveViewMode === "interior" ? vehicle.interior.imageUrl : undefined;
   const cacheKey = spriteCacheKey(vehicle.slug, effectiveViewMode === "exterior" ? activeVariantId : "interior");
   const activeScene = sceneId === "own" ? undefined : SCENES.find((s) => s.id === sceneId);
@@ -228,7 +229,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             cacheKey={cacheKey}
             vehicleKey={vehicle.slug}
             spriteSets={spriteSets}
-            staticImageUrl={interiorImageUrl}
+            panoramaUrl={interiorImageUrl}
             backgroundUrl={backgroundUrl}
             backgroundColor={backgroundColor}
             isFullscreen={isFullscreen}
