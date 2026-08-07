@@ -7,10 +7,11 @@ import type { Category, Vehicle } from "@/lib/types";
 import { iconAssetUrl, isVehicleAvailable } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
-/** Puerta de vehículo (trazo, hereda color) — glifo del badge "Ingresar" de
- * la card activa. Inline (no /assets/icons) por ser UI pura: sin red ni
- * precarga que mantener. */
-function CarDoorIcon({ className }: { className?: string }) {
+/** "Ingresar al vehículo": flecha apuntando hacia una puerta de vehículo
+ * (la puerta a la derecha, con ventanilla y manija; la flecha entra desde
+ * la izquierda). Trazo con currentColor. Inline (no /assets/icons) por ser
+ * UI pura: sin red ni precarga que mantener. */
+function EnterVehicleIcon({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -22,13 +23,14 @@ function CarDoorIcon({ className }: { className?: string }) {
       className={className}
       aria-hidden
     >
-      {/* Contorno: borde superior inclinado (marco de la ventanilla). */}
-      <path d="M20 20H5a1 1 0 0 1-1-1v-8.6a2 2 0 0 1 .6-1.5l5-4.3A2 2 0 0 1 11.9 5H19a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1Z" />
-      {/* Línea de la ventanilla. */}
-      <path d="M4.3 11.5H20" />
-      <path d="M11.5 5.4v6.1" />
-      {/* Manija. */}
-      <path d="M8 15h4" />
+      {/* Puerta (derecha): borde superior inclinado = marco de ventanilla. */}
+      <path d="M13 19v-5.6a2 2 0 0 1 .6-1.4l4.4-4.4A2 2 0 0 1 19.4 7h.6a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1Z" />
+      {/* Línea de la ventanilla y manija. */}
+      <path d="M13 13.4h8" />
+      <path d="M15.5 16.2h3" />
+      {/* Flecha que apunta HACIA la puerta. */}
+      <path d="M2.5 12h7.5" />
+      <path d="m7 8.5 3.5 3.5L7 15.5" />
     </svg>
   );
 }
@@ -267,14 +269,15 @@ function CategoryCarousel({
                       <p className="text-base font-bold leading-tight">{v.commercialName}</p>
                       <p className={cn("text-xs", isActive ? "text-white/80" : "text-[#6B7280]")}>{v.typeTag}</p>
                     </div>
-                    {/* Badge "Ingresar" (puerta de vehículo) — SOLO en la
-                        card activa y con vehículo disponible. En mobile un
-                        TAP sobre el badge entra directo a los controles del
-                        visualizador (stopPropagation: no re-dispara la
-                        selección); en desktop quien confirma es el DOBLE
-                        clic, que burbujea hasta el onDoubleClick de la card
-                        — un clic simple ahí no hace nada raro (re-selecciona
-                        la misma card). */}
+                    {/* Ícono "Ingresar" (flecha hacia la puerta del
+                        vehículo) — SOLO en la card activa y con vehículo
+                        disponible: BLANCO, sin fondo, CENTRADO en la card.
+                        En mobile un TAP sobre él entra directo a los
+                        controles del visualizador (stopPropagation: no
+                        re-dispara la selección); en desktop quien confirma
+                        es el DOBLE clic, que burbujea hasta el
+                        onDoubleClick de la card — un clic simple ahí solo
+                        re-selecciona la misma card. */}
                     {isActive && isVehicleAvailable(v) && (
                       <span
                         role="button"
@@ -286,9 +289,9 @@ function CategoryCarousel({
                             onConfirmVehicle();
                           }
                         }}
-                        className="absolute right-2 top-2 z-20 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/95 text-[#12141A] shadow-md transition-transform hover:scale-110"
+                        className="group absolute left-1/2 top-1/2 z-20 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center text-white"
                       >
-                        <CarDoorIcon className="h-5 w-5" />
+                        <EnterVehicleIcon className="h-10 w-10 drop-shadow-md transition-transform group-hover:scale-110" />
                       </span>
                     )}
                     {/* Vehículo grande recortado por el borde derecho de la
