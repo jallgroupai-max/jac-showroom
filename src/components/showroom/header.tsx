@@ -7,6 +7,13 @@ interface HeaderProps {
   onMeInteresa: () => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+  /** En mobile/tablet, "pantalla completa" debe verse REALMENTE completa —
+   * a diferencia de desktop, donde el header sigue flotando como una
+   * pastilla con el logo, en mobile no hay botón en el header para volver
+   * a salir (esa función vive en el pod del visualizador, ver
+   * sprite-viewer.tsx), así que ocultamos el header entero por debajo de
+   * `lg` mientras esté activo. */
+  hideOnMobile?: boolean;
 }
 
 /**
@@ -27,7 +34,7 @@ interface HeaderProps {
  * título, y el título ya no se oculta.
  */
 export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
-  { title, onMeInteresa, isFullscreen, onToggleFullscreen },
+  { title, onMeInteresa, isFullscreen, onToggleFullscreen, hideOnMobile },
   ref
 ) {
   return (
@@ -35,7 +42,8 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
       ref={ref}
       className={cn(
         "pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between border-b px-4 py-4 transition-colors duration-300 ease-in-out sm:px-8",
-        isFullscreen ? "border-black/0 bg-[#F4F6F9]/0" : "border-black/5 bg-[#F4F6F9]"
+        isFullscreen ? "border-black/0 bg-[#F4F6F9]/0" : "border-black/5 bg-[#F4F6F9]",
+        hideOnMobile && "max-lg:hidden"
       )}
     >
       <div

@@ -204,6 +204,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
           onMeInteresa={() => setLeadFormOpen(true)}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
+          hideOnMobile={isFullscreen}
         />
       </motion.div>
 
