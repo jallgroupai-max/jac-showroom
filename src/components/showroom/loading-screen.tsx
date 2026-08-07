@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import type { Vehicle } from "@/lib/types";
-import { QUALITIES } from "@/lib/types";
 import { readyThresholdForTier, useConnectionTier } from "@/lib/connection";
 import { getPreloadAssetUrls } from "@/lib/mock-data";
 import {
   FRAME_COUNT,
+  loadSpriteSetQuality,
   loadSpriteSetsProgressively,
-  loadSpriteSetsUpTo,
   preloadStaticAssets,
   spriteCacheKey,
 } from "@/lib/sprite-cache";
+
+/** Logo para el Loading — con fallback al texto "JAC" si el archivo aún no
+ * existe en /public (mismo estilo que el logo de texto del header). */
+const LOGO_URL = "/assets/logo.png";
 
 interface LoadingScreenProps {
   /** Vehículo inicial — se precargan TODOS sus colores antes de entrar. */
@@ -22,10 +26,11 @@ interface LoadingScreenProps {
 /**
  * Ver docs/APP-FLOW.md §3.1 y docs/TRD.md §4.2. Progreso REAL (no simulado):
  * el 100% exige que TODO lo visible al entrar esté descargado —
- * 1) los 36 frames de TODOS los colores del vehículo inicial, hasta la
- *    calidad que dicta la velocidad de conexión (readyThresholdForTier);
- *    las calidades superiores siguen cargando en segundo plano dentro del
- *    visualizador, de forma transparente;
+ * 1) los 36 frames de TODOS los colores del vehículo inicial, EN la calidad
+ *    que dicta la velocidad de conexión (readyThresholdForTier) — un único
+ *    set por color: bajar además las calidades inferiores triplicaba la
+ *    espera sin aportar nada visible; las demás calidades siguen cargando
+ *    en segundo plano, de forma transparente;
  * 2) los assets estáticos: la imagen de la card de CADA vehículo del
  *    catálogo, los íconos (cards + puntos de interés) y los backgrounds de
  *    escena (claro/oscuro y "propio").
@@ -46,17 +51,15 @@ export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
   const [spriteLoaded, setSpriteLoaded] = useState(0);
   const [spritesDone, setSpritesDone] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
-  // Total de frames objetivo con el umbral vigente: todas las variantes,
-  // calidades low..threshold. Si la medición de velocidad sube el umbral a
-  // mitad de carga, el total crece y el porcentaje se recalcula solo.
-  const spriteTotal = useMemo(() => {
-    const allowed = new Set(QUALITIES.slice(0, QUALITIES.indexOf(threshold) + 1));
-    return vehicle.variants.reduce(
-      (sum, v) => sum + v.exteriorSprites.filter((s) => allowed.has(s.quality)).length * FRAME_COUNT,
-      0
-    );
-  }, [vehicle, threshold]);
+  // UN set de 36 frames por color (solo la calidad del umbral — las demás
+  // bajan en segundo plano): el total no depende del umbral, siempre son
+  // 36 frames por cada color con modelo 360°.
+  const spriteTotal = useMemo(
+    () => vehicle.variants.filter((v) => v.exteriorSprites.length > 0).length * FRAME_COUNT,
+    [vehicle]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +91,7 @@ export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
     (async () => {
       for (const v of vehicle.variants) {
         if (cancelled) return;
-        await loadSpriteSetsUpTo(
+        await loadSpriteSetQuality(
           spriteCacheKey(vehicle.slug, v.id),
           v.exteriorSprites,
           threshold,
@@ -134,12 +137,40 @@ export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-[#F4F6F9] px-6 text-center">
-      <span className="text-2xl font-bold tracking-tight text-[#12141A]">JAC</span>
-      <p className="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-[#6B7280]">
+      {logoFailed ? (
+        // Aún sin arte final en /assets/logo.png: texto con el mismo estilo
+        // que el logo del header.
+        <span className="text-2xl font-black italic tracking-tighter text-[#12141A]">JAC</span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- logo servido directo desde /public
+        <img src={LOGO_URL} alt="JAC" className="h-12 w-auto" onError={() => setLogoFailed(true)} />
+      )}
+      {/* Ambos rótulos PARPADEAN (opacity 0.2 <-> 1) mientras dura la carga
+          y desaparecen al llegar al 100% — con fade, y conservando su lugar
+          en el layout para que nada salte. */}
+      <motion.p
+        animate={isReady ? { opacity: 0 } : { opacity: [0.2, 1, 0.2] }}
+        transition={
+          isReady
+            ? { duration: 0.3, ease: "easeOut" }
+            : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }
+        }
+        className="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-[#6B7280]"
+      >
         Iniciando servidores…
-      </p>
+      </motion.p>
       <p className="mt-4 text-5xl font-extrabold text-[#12141A]">{percent}%</p>
-      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#6B7280]">Loading</p>
+      <motion.p
+        animate={isReady ? { opacity: 0 } : { opacity: [0.2, 1, 0.2] }}
+        transition={
+          isReady
+            ? { duration: 0.3, ease: "easeOut" }
+            : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }
+        }
+        className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#6B7280]"
+      >
+        Loading
+      </motion.p>
 
       <div className="mt-6 h-2 w-[280px] max-w-[70vw] overflow-hidden rounded-full bg-[#E3E5EA]" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-live="polite">
         <div

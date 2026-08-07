@@ -61,7 +61,7 @@ async function preloadQuality(key: string, spriteSet: SpriteSet, onFrame?: () =>
   const promise = (async () => {
     // Los 36 frames se cargan EN PARALELO (con tope de concurrencia) — cargarlos
     // uno a uno secuencialmente los haría 36x más lentos sin ningún beneficio.
-    const CONCURRENCY = 8;
+    const CONCURRENCY = 12;
     const frames = Array.from({ length: FRAME_COUNT }, (_, i) => i + 1);
     let cursor = 0;
     async function worker() {
@@ -108,8 +108,13 @@ export async function loadSpriteSetsProgressively(
   );
   const total = ordered.length * FRAME_COUNT;
   let loaded = 0;
+  // Con una calidad ya cacheada, descargar las INFERIORES no aporta nada
+  // visible (bestQuality nunca baja) — se saltan sin tocar la red. Ahorra
+  // p. ej. bajar low+medium de un color que ya está en high.
+  const best = highestCachedQuality(key);
+  const bestIdx = best ? QUALITIES.indexOf(best) : -1;
   for (const set of ordered) {
-    if (isQualityCached(key, set.quality)) {
+    if (isQualityCached(key, set.quality) || QUALITIES.indexOf(set.quality) < bestIdx) {
       loaded += FRAME_COUNT;
       onProgress?.(loaded, total, set.quality);
       onQualityComplete?.(set.quality);
@@ -124,38 +129,42 @@ export async function loadSpriteSetsProgressively(
 }
 
 /**
- * Carga los sets de un color SOLO hasta `maxQuality` (incluida), siempre en
- * orden low -> medium -> high. Es la carga del Loading inicial: el umbral lo
- * decide la velocidad de conexión (readyThresholdForTier) y las calidades
- * superiores quedan para el segundo plano dentro del visualizador.
- * onProgress reporta (framesLoaded, framesTotal) del objetivo acotado.
+ * Carga SOLO el set de la calidad pedida (la del umbral de conexión) para un
+ * color — es la carga del Loading inicial: UN único set completo por color
+ * basta para entrar y para el barrido de cambio de color, y descargar además
+ * las calidades inferiores triplicaba el peso del Loading sin beneficio
+ * (bestQuality nunca las mostraría). El resto de calidades baja después en
+ * segundo plano (loadSpriteSetsProgressively). onProgress reporta
+ * (framesLoaded, framesTotal) del set.
  */
-export async function loadSpriteSetsUpTo(
+export async function loadSpriteSetQuality(
   key: string,
   spriteSets: SpriteSet[],
-  maxQuality: Quality,
+  quality: Quality,
   onProgress?: (loaded: number, total: number) => void
 ): Promise<void> {
-  const ordered = QUALITIES.slice(0, QUALITIES.indexOf(maxQuality) + 1)
-    .map((q) => spriteSets.find((s) => s.quality === q))
-    .filter((s): s is SpriteSet => Boolean(s));
-  const total = ordered.length * FRAME_COUNT;
-  let loaded = 0;
-  onProgress?.(0, total);
-  for (let i = 0; i < ordered.length; i++) {
-    const set = ordered[i];
-    if (!isQualityCached(key, set.quality)) {
-      await preloadQuality(key, set, () => {
-        loaded++;
-        onProgress?.(loaded, total);
-      });
-    }
-    // Ajuste exacto al cierre de cada calidad: si la descarga real la hizo
-    // otra invocación concurrente (dedup de loadingPromises), los onFrame no
-    // llegan a este llamador — el conteo se corrige al valor cierto.
-    loaded = (i + 1) * FRAME_COUNT;
-    onProgress?.(loaded, total);
+  // Fallback defensivo: sin el set exacto, se usa el mejor disponible que no
+  // supere la calidad pedida (o el primero que haya).
+  const maxIdx = QUALITIES.indexOf(quality);
+  const set =
+    spriteSets.find((s) => s.quality === quality) ??
+    [...spriteSets].reverse().find((s) => QUALITIES.indexOf(s.quality) < maxIdx) ??
+    spriteSets[0];
+  if (!set) return;
+  if (isQualityCached(key, set.quality)) {
+    onProgress?.(FRAME_COUNT, FRAME_COUNT);
+    return;
   }
+  let loaded = 0;
+  onProgress?.(0, FRAME_COUNT);
+  await preloadQuality(key, set, () => {
+    loaded++;
+    onProgress?.(loaded, FRAME_COUNT);
+  });
+  // Ajuste exacto al cierre: si la descarga real la hizo otra invocación
+  // concurrente (dedup de loadingPromises), los onFrame no llegan a este
+  // llamador — el conteo se corrige al valor cierto.
+  onProgress?.(FRAME_COUNT, FRAME_COUNT);
 }
 
 /**
