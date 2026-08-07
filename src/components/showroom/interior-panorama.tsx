@@ -26,8 +26,10 @@ export function InteriorPanorama({ imageUrl }: InteriorPanoramaProps) {
     const viewer = new Viewer({
       container,
       panorama: imageUrl,
-      navbar: ["zoom"],
-      defaultZoomLvl: 50,
+      // Sin barra de controles: el zoom queda fijo en 75% (rueda/pellizco
+      // siguen funcionando, pero sin botones en pantalla).
+      navbar: false,
+      defaultZoomLvl: 75,
       // Un dedo alcanza para mirar alrededor (igual que en Changan).
       touchmoveTwoFingers: false,
     });

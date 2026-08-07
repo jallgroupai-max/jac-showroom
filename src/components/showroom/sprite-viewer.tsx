@@ -167,7 +167,8 @@ export function SpriteViewer({
   if (panoramaUrl) {
     return (
       <div className={cn("relative h-full w-full", className)}>
-        <div className="absolute inset-x-0 top-0 bottom-[10%] overflow-hidden">
+        {/* 10% menos de alto que el espacio del fondo (bottom 10% -> 20%). */}
+        <div className="absolute inset-x-0 top-0 bottom-[20%] overflow-hidden">
           <InteriorPanorama imageUrl={panoramaUrl} />
         </div>
       </div>
