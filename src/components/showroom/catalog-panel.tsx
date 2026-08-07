@@ -289,9 +289,9 @@ function CategoryCarousel({
                             onConfirmVehicle();
                           }
                         }}
-                        className="group absolute left-1/2 top-1/2 z-20 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center text-white"
+                        className="group absolute left-1/2 top-1/2 z-20 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center text-white/75"
                       >
-                        <EnterVehicleIcon className="h-10 w-10 drop-shadow-md transition-transform group-hover:scale-110" />
+                        <EnterVehicleIcon className="h-14 w-14 drop-shadow-md transition-transform group-hover:scale-110" />
                       </span>
                     )}
                     {/* Vehículo grande recortado por el borde derecho de la
