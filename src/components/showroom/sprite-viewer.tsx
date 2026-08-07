@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Minus, Plus, RotateCcw, RotateCw, X } from "lucide-react";
+import { Maximize, Minimize, Minus, Plus, RotateCcw, RotateCw, X } from "lucide-react";
 import type { SpriteSet } from "@/lib/types";
 import { UNAVAILABLE_VEHICLE_IMAGE } from "@/lib/mock-data";
 import { FRAME_COUNT, warmDecodedFrames } from "@/lib/sprite-cache";
@@ -35,6 +35,13 @@ interface SpriteViewerProps {
    * (showroom-app.tsx) — el pod de girar/zoom baja un poco para no quedar
    * debajo de sus botones (solo aplica desde `lg:`, ver más abajo). */
   isFullscreen?: boolean;
+  /** Alterna "pantalla completa" (maximiza el héroe ocultando el header y,
+   * en mobile, también los controles/CTA — ver showroom-app.tsx). Con esto
+   * seteado se agrega un botón dedicado: en el pod de girar/zoom para la
+   * vista exterior, y junto a "Cerrar" para el panorama interior — visible
+   * en DESKTOP (vía el botón del header, no acá) y en MOBILE/TABLET en
+   * horizontal (donde el header no tiene ese botón). */
+  onToggleFullscreen?: () => void;
   /** false mientras el selector de catálogo está abierto — oculta el pod de
    * girar/zoom, que no tiene sentido mostrar sobre esa pantalla. */
   showControls?: boolean;
@@ -66,6 +73,7 @@ export function SpriteViewer({
   backgroundColor,
   className,
   isFullscreen,
+  onToggleFullscreen,
   showControls = true,
   onFirstRotate,
 }: SpriteViewerProps) {
@@ -178,16 +186,35 @@ export function SpriteViewer({
           <InteriorPanorama imageUrl={panoramaUrl} />
         </div>
 
-        {/* "Cerrar" flotante (solo DESKTOP): pastilla negra como el resto de
-            los CTA, con la X a la IZQUIERDA del texto. Semitransparente en
-            reposo y opaca al pasar el mouse. Vuelve a la vista Exterior. */}
+        {/* "Cerrar" flotante — pastilla negra como el resto de los CTA, con
+            la X a la IZQUIERDA del texto. Semitransparente en reposo y
+            opaca al pasar el mouse. Vuelve a la vista Exterior. Visible en
+            DESKTOP y en MOBILE/TABLET horizontal (ahí no hay otra forma de
+            salir del panorama si los controles quedan ocultos por
+            "pantalla completa" — ver showroom-app.tsx). */}
         {onClosePanorama && (
           <button
             type="button"
             onClick={onClosePanorama}
-            className="absolute left-1/2 top-6 z-20 hidden -translate-x-1/2 cursor-pointer items-center gap-2 rounded-full bg-[#111318] px-5 py-2.5 text-sm font-semibold text-white opacity-50 shadow-lg transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none lg:flex"
+            className="absolute left-1/2 top-6 z-20 hidden -translate-x-1/2 cursor-pointer items-center gap-2 rounded-full bg-[#111318] px-5 py-2.5 text-sm font-semibold text-white opacity-50 shadow-lg transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none max-lg:landscape:flex lg:flex"
           >
             <X className="h-4 w-4" /> Cerrar
+          </button>
+        )}
+
+        {/* "Pantalla completa" — mismo estilo/reglas de visibilidad que
+            Cerrar, del lado derecho. En desktop el botón real vive en el
+            Header (ver header.tsx); acá solo hace falta en mobile/tablet
+            horizontal, donde el header no tiene ese botón. */}
+        {onToggleFullscreen && (
+          <button
+            type="button"
+            onClick={onToggleFullscreen}
+            aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            className="absolute right-4 top-6 z-20 hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-[#111318] text-white opacity-50 shadow-lg transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none max-lg:landscape:flex"
+          >
+            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
           </button>
         )}
       </div>
@@ -410,6 +437,26 @@ export function SpriteViewer({
                 <Minus className="h-4 w-4" />
               </button>
             </div>
+
+            {/* "Pantalla completa" — SOLO mobile/tablet horizontal: en
+                desktop el botón real vive en el Header (ver header.tsx); en
+                mobile portrait no aplica (pedido explícito: solo desktop u
+                horizontal). Mismo estilo que el resto del pod. */}
+            {onToggleFullscreen && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFullscreen();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                className="hidden h-9 w-9 items-center justify-center rounded-full bg-white/90 text-[#12141A] shadow-md backdrop-blur transition-all hover:scale-105 hover:bg-[#111318] hover:text-white focus-visible:bg-[#111318] focus-visible:text-white focus-visible:outline-none max-lg:landscape:flex"
+              >
+                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

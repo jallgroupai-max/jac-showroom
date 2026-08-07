@@ -14,6 +14,7 @@ import {
 } from "@/lib/mock-data";
 import { spriteCacheKey } from "@/lib/sprite-cache";
 import { useFullscreen } from "@/hooks/use-fullscreen";
+import { cn } from "@/lib/utils";
 import { LoadingScreen } from "./loading-screen";
 import { Header } from "./header";
 import { SpriteViewer } from "./sprite-viewer";
@@ -253,6 +254,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             backgroundUrl={backgroundUrl}
             backgroundColor={backgroundColor}
             isFullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
             showControls={subPhase === "visualizer"}
             onFirstRotate={() => setHasRotated(true)}
           />
@@ -294,9 +296,17 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
       {/* El hint de "arrastra para rotar" NO existe en mobile/tablet (pedido
           explícito) — solo en desktop, agrupado con el toolbar de POI. */}
 
-      {/* Controles: fila normal debajo del héroe en mobile/tablet;
-          overlay absoluto flotando sobre el héroe desde desktop (lg:). */}
-      <div className="relative z-10 shrink-0 px-4 pb-3 sm:px-6 mx-auto lg:absolute lg:inset-x-0 lg:bottom-0 lg:shrink lg:pb-6 max-w-6xl w-full">
+      {/* Controles: fila normal debajo del héroe en mobile/tablet; overlay
+          absoluto flotando sobre el héroe desde desktop (lg:). En "pantalla
+          completa" MOBILE se ocultan (max-lg:hidden) para maximizar el
+          área visible del 360 — en desktop flotan sobre el héroe sin
+          restarle espacio, así que ahí se mantienen visibles siempre. */}
+      <div
+        className={cn(
+          "relative z-10 shrink-0 px-4 pb-3 sm:px-6 mx-auto lg:absolute lg:inset-x-0 lg:bottom-0 lg:shrink lg:pb-6 max-w-6xl w-full",
+          isFullscreen && "max-lg:hidden"
+        )}
+      >
         <AnimatePresence mode="wait" initial={false}>
           {subPhase === "catalog" ? (
             <motion.div
@@ -377,10 +387,11 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
 
       {/* CTA en mobile/tablet — SOLO visible dentro del visualizador (con
           los controles de color/escena); en el selector de catálogo no
-          aparece. En desktop sigue en el header. Botón centrado al 90% del
-          ancho, sin barra blanca ni borde (se funde con el fondo de la
-          página, fiel al Figma mobile). */}
-      {subPhase === "visualizer" && (
+          aparece, y tampoco en "pantalla completa" (mismo criterio que los
+          controles de arriba). En desktop sigue en el header. Botón
+          centrado al 90% del ancho, sin barra blanca ni borde (se funde con
+          el fondo de la página, fiel al Figma mobile). */}
+      {subPhase === "visualizer" && !isFullscreen && (
         <div className="relative flex shrink-0 justify-center p-3 lg:hidden">
           <button
             type="button"
