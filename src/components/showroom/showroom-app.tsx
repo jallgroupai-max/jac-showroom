@@ -184,7 +184,13 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   }
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-[#F4F6F9]">
+    // h-dvh + overflow-y-auto (no overflow-hidden a secas): en portrait el
+    // héroe flex-1 absorbe todo el alto libre y normalmente no hace falta
+    // scrollear, pero en landscape mobile/tablet el contenido (héroe +
+    // controles + CTA) no entra en el poco alto disponible — sin el scroll
+    // de escape el usuario quedaba atrapado sin poder ver el botón "Me
+    // Interesa". En desktop (lg:) se mantiene bloqueado como siempre.
+    <div className="relative flex h-dvh flex-col overflow-y-auto bg-[#F4F6F9] lg:overflow-hidden">
       <motion.div
         className="shrink-0"
         initial={false}
@@ -208,7 +214,10 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
           (sobre el héroe) lo cierra y vuelve a los controles — con umbral de
           movimiento para que un arrastre de rotación no cuente como clic. */}
       <div
-        className="relative min-h-0 flex-1 overflow-hidden"
+        // min-h-[45vh]: piso de alto para el héroe en mobile/tablet — sin
+        // esto, en landscape (poco alto disponible) el flex-1 lo aplastaba
+        // hasta casi desaparecer para hacerle lugar a los controles.
+        className="relative min-h-[45vh] flex-1 overflow-hidden lg:min-h-0"
         onPointerDown={(e) => {
           heroPressRef.current = { x: e.clientX, y: e.clientY };
         }}
@@ -250,9 +259,10 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
           {/* Botón de INGRESO flotando encima del carro — visible solo con
               el selector de vehículos abierto y vehículo disponible
               (reemplaza al ícono que vivía en la card). Viaja con el héroe
-              cuando este se desplaza en desktop. En MOBILE es una pastilla
-              más grande con el texto "Ver vehículo"; en desktop conserva el
-              círculo con solo el ícono. */}
+              cuando este se desplaza en desktop. Círculo con SOLO el ícono
+              (sin texto), un poco más grande en mobile; el fondo
+              semitransparente con backdrop-blur deja ver el carro
+              difuminado a través del botón. */}
           {subPhase === "catalog" && isVehicleAvailable(vehicle) && (
             <button
               type="button"
@@ -262,10 +272,9 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
                 e.stopPropagation();
                 confirmVehicle();
               }}
-              className="absolute left-1/2 top-[42%] z-20 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2.5 rounded-full bg-white/90 px-6 py-3.5 text-sm font-semibold text-[#12141A] shadow-lg backdrop-blur transition-transform hover:scale-110 lg:h-14 lg:w-14 lg:justify-center lg:gap-0 lg:px-0 lg:py-0"
+              className="absolute left-1/2 top-[42%] z-20 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-[#12141A] shadow-lg backdrop-blur transition-transform hover:scale-110 lg:h-14 lg:w-14"
             >
               <EnterVehicleIcon className="h-9 w-9 lg:h-8 lg:w-8" />
-              <span className="lg:hidden">Ver vehículo</span>
             </button>
           )}
         </motion.div>
