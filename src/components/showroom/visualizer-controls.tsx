@@ -3,9 +3,15 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import useEmblaCarousel from "embla-carousel-react";
-import { Pencil } from "lucide-react";
+import { Ban, Pencil } from "lucide-react";
 import type { Scene, Vehicle, ViewMode } from "@/lib/types";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 interface VisualizerControlsProps {
@@ -365,43 +371,72 @@ export function VisualizerControls({
         </div>
       </div>
 
-      {/* Modal de fondos personalizados (fondo blanco): clic en uno lo
-          aplica como escena — Claro/Oscuro quedan deseleccionados — y
-          cierra el modal. */}
-      <Dialog open={customSceneModalOpen} onOpenChange={setCustomSceneModalOpen}>
-        <DialogContent className="max-w-md rounded-3xl bg-white p-6">
-          <DialogTitle className="text-base font-extrabold text-[#12141A]">
-            Fondos personalizados
-          </DialogTitle>
-          <div className="mt-2 grid grid-cols-2 gap-3">
-            {customScenes.map((scene) => (
-              <button
-                key={scene.id}
-                type="button"
-                onClick={() => {
-                  onSceneChange(scene.id);
-                  setCustomSceneModalOpen(false);
-                }}
-                className={cn(
-                  "cursor-pointer overflow-hidden rounded-2xl border-2 text-left transition-transform hover:scale-[1.02]",
-                  scene.id === activeSceneId ? "border-[#1E3A8A]" : "border-black/10"
-                )}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- fondo servido directo desde /public */}
-                <img
-                  src={scene.imageUrl}
-                  alt={scene.label}
-                  draggable={false}
-                  className="h-24 w-full object-cover"
-                />
-                <span className="block px-3 py-2 text-xs font-semibold text-[#12141A]">
-                  {scene.label}
-                </span>
-              </button>
-            ))}
+      {/* Panel LATERAL de fondos (estilo fondos de Google Meet): se desliza
+          desde la derecha, una fila por fondo con la imagen a todo el ancho
+          y el nombre centrado SOBRE la imagen. La primera fila es "Sin
+          fondo personalizado" (ícono de negación): vuelve al default Claro
+          y con eso Claro/Oscuro recuperan su selección normal. */}
+      <Sheet open={customSceneModalOpen} onOpenChange={setCustomSceneModalOpen}>
+        <SheetContent side="right" className="w-[85vw] gap-0 bg-white sm:max-w-sm">
+          <SheetHeader className="p-5 pb-3">
+            <SheetTitle className="text-base font-extrabold text-[#12141A]">
+              Fondo del escenario
+            </SheetTitle>
+            <SheetDescription className="text-xs text-[#6B7280]">
+              Elige el escenario donde quieres ver tu vehículo.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col gap-3 overflow-y-auto p-5 pt-1">
+            {/* Sin fondo personalizado — activo cuando NO hay fondo custom. */}
+            <button
+              type="button"
+              onClick={() => {
+                onSceneChange("light");
+                setCustomSceneModalOpen(false);
+              }}
+              className={cn(
+                "flex h-24 w-full shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#F4F6F9] text-[#6B7280] transition-all hover:bg-[#ECEEF2]",
+                !isCustomSceneActive && "ring-2 ring-[#1E3A8A] ring-offset-2"
+              )}
+            >
+              <Ban className="h-6 w-6" />
+              <span className="text-xs font-semibold">Sin fondo personalizado</span>
+            </button>
+
+            {customScenes.map((scene) => {
+              const isActive = scene.id === activeSceneId;
+              return (
+                <button
+                  key={scene.id}
+                  type="button"
+                  onClick={() => {
+                    onSceneChange(scene.id);
+                    setCustomSceneModalOpen(false);
+                  }}
+                  className={cn(
+                    "relative h-28 w-full shrink-0 cursor-pointer overflow-hidden rounded-2xl transition-all hover:scale-[1.01]",
+                    isActive && "ring-2 ring-[#1E3A8A] ring-offset-2"
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- fondo servido directo desde /public */}
+                  <img
+                    src={scene.imageUrl}
+                    alt=""
+                    aria-hidden
+                    draggable={false}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  {/* Velo oscuro sutil para que el nombre siempre se lea. */}
+                  <span aria-hidden className="absolute inset-0 bg-black/25 transition-colors hover:bg-black/15" />
+                  <span className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm font-bold text-white drop-shadow-md">
+                    {scene.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
