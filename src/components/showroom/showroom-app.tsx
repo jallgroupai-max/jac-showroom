@@ -16,7 +16,7 @@ import { useFullscreen } from "@/hooks/use-fullscreen";
 import { LoadingScreen } from "./loading-screen";
 import { Header } from "./header";
 import { SpriteViewer } from "./sprite-viewer";
-import { CatalogPanel } from "./catalog-panel";
+import { CatalogPanel, EnterVehicleIcon } from "./catalog-panel";
 import { VisualizerControls } from "./visualizer-controls";
 import { PointsOfInterest } from "./points-of-interest";
 import { SpecsPanel } from "./specs-panel";
@@ -127,8 +127,15 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const variant = vehicle.variants.find((v) => v.id === activeVariantId) ?? vehicle.variants[0];
   const vehiclesInCategory = useMemo(() => getVehiclesByCategory(activeCategorySlug), [activeCategorySlug]);
 
-  const spriteSets = viewMode === "exterior" ? variant.exteriorSprites : vehicle.interior.sprites;
-  const cacheKey = spriteCacheKey(vehicle.slug, viewMode === "exterior" ? activeVariantId : "interior");
+  // Interior disponible = sprites 360° o foto única. Si el vehículo activo
+  // no lo tiene, la vista EFECTIVA cae a exterior aunque el estado siga en
+  // "interior" (p. ej. cambió de vehículo estando en Interior).
+  const interiorAvailable = vehicle.interior.sprites.length > 0 || Boolean(vehicle.interior.imageUrl);
+  const effectiveViewMode: ViewMode = interiorAvailable ? viewMode : "exterior";
+  const spriteSets = effectiveViewMode === "exterior" ? variant.exteriorSprites : vehicle.interior.sprites;
+  // Interior con foto única: el viewer la muestra estática (sin 360°).
+  const interiorImageUrl = effectiveViewMode === "interior" ? vehicle.interior.imageUrl : undefined;
+  const cacheKey = spriteCacheKey(vehicle.slug, effectiveViewMode === "exterior" ? activeVariantId : "interior");
   const activeScene = sceneId === "own" ? undefined : SCENES.find((s) => s.id === sceneId);
   const backgroundColor = activeScene?.color;
   const backgroundUrl = backgroundColor ? undefined : (activeScene?.imageUrl ?? vehicle.ownBackgroundUrl);
@@ -221,12 +228,32 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             cacheKey={cacheKey}
             vehicleKey={vehicle.slug}
             spriteSets={spriteSets}
+            staticImageUrl={interiorImageUrl}
             backgroundUrl={backgroundUrl}
             backgroundColor={backgroundColor}
             isFullscreen={isFullscreen}
             showControls={subPhase === "visualizer"}
             onFirstRotate={() => setHasRotated(true)}
           />
+
+          {/* Botón circular de INGRESO flotando encima del carro — visible
+              solo con el selector de vehículos abierto y vehículo
+              disponible (reemplaza al ícono que vivía en la card). Viaja
+              con el héroe cuando este se desplaza en desktop. */}
+          {subPhase === "catalog" && isVehicleAvailable(vehicle) && (
+            <button
+              type="button"
+              aria-label="Ingresar al vehículo"
+              title="Ingresar"
+              onClick={(e) => {
+                e.stopPropagation();
+                confirmVehicle();
+              }}
+              className="absolute left-1/2 top-[42%] z-20 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white/90 text-[#12141A] shadow-lg backdrop-blur transition-transform hover:scale-110"
+            >
+              <EnterVehicleIcon className="h-8 w-8" />
+            </button>
+          )}
         </motion.div>
 
         {subPhase === "visualizer" && (
@@ -279,7 +306,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               className="flex flex-col gap-3"
             >
               <div className="relative hidden items-center gap-3 lg:flex">
-                <PointsOfInterest points={vehicle.pointsOfInterest} mode={viewMode} />
+                <PointsOfInterest points={vehicle.pointsOfInterest} mode={effectiveViewMode} />
                 {/* Centrado absoluto respecto al ancho completo de la fila —
                     los POI de la izquierda no lo desplazan del centro.
                     PARPADEA (opacity 0.2 <-> 1, mismo ritmo que el Loading)
@@ -303,7 +330,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               </div>
               <VisualizerControls
                 vehicle={vehicle}
-                viewMode={viewMode}
+                viewMode={effectiveViewMode}
                 onViewModeChange={setViewMode}
                 activeVariantId={activeVariantId}
                 onVariantChange={setActiveVariantId}

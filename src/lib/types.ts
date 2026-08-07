@@ -35,6 +35,10 @@ export interface VehicleVariant {
 export interface InteriorSprites {
   /** Sprites interior, uno por calidad. No tiene variantes de color. */
   sprites: SpriteSet[];
+  /** Alternativa a `sprites`: foto única del interior (sin rotación 360°).
+   * Con ambos vacíos, el vehículo NO tiene vista interior y el toggle
+   * Exterior/Interior queda deshabilitado. */
+  imageUrl?: string;
 }
 
 export interface SpecItem {

@@ -159,19 +159,28 @@ export function VisualizerControls({
       <div className="order-3 hidden h-8 w-px bg-black/10 lg:order-2 lg:block" />
 
       <div className="order-4 flex w-full items-center gap-1 rounded-full bg-[#F4F6F9] p-1 lg:order-3 lg:w-auto">
-        {(["exterior", "interior"] as ViewMode[]).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => onViewModeChange(mode)}
-            className={cn(
-              "flex-1 rounded-full px-4 py-2 text-center text-sm font-semibold capitalize transition-colors lg:flex-none",
-              viewMode === mode ? "bg-[#111318] text-white" : "text-[#6B7280]"
-            )}
-          >
-            {mode === "exterior" ? "Exterior" : "Interior"}
-          </button>
-        ))}
+        {(["exterior", "interior"] as ViewMode[]).map((mode) => {
+          // Interior habilitado solo si el vehículo tiene vista interior
+          // (sprites 360° o foto única — hoy solo ÉLITE la tiene).
+          const interiorAvailable =
+            vehicle.interior.sprites.length > 0 || Boolean(vehicle.interior.imageUrl);
+          const modeDisabled = mode === "interior" && !interiorAvailable;
+          return (
+            <button
+              key={mode}
+              type="button"
+              disabled={modeDisabled}
+              onClick={() => onViewModeChange(mode)}
+              className={cn(
+                "flex-1 rounded-full px-4 py-2 text-center text-sm font-semibold capitalize transition-colors lg:flex-none",
+                viewMode === mode ? "bg-[#111318] text-white" : "text-[#6B7280]",
+                modeDisabled && "cursor-not-allowed opacity-40"
+              )}
+            >
+              {mode === "exterior" ? "Exterior" : "Interior"}
+            </button>
+          );
+        })}
       </div>
 
       {/* Carrusel de colores MOBILE — full-bleed: w-screen + margen negativo

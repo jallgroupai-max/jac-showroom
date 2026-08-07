@@ -19,6 +19,9 @@ interface SpriteViewerProps {
    * con el MISMO vehicleKey (cambio de color/vista del mismo vehículo). */
   vehicleKey?: string;
   spriteSets: SpriteSet[];
+  /** Foto única a mostrar EN LUGAR del sprite 360° (vista Interior de los
+   * vehículos sin set interior): estática, sin rotación. */
+  staticImageUrl?: string;
   /** Alternativa a `backgroundColor` — foto de escena. */
   backgroundUrl?: string;
   /** Alternativa a `backgroundUrl` — fondo de color sólido. */
@@ -53,6 +56,7 @@ export function SpriteViewer({
   cacheKey,
   vehicleKey,
   spriteSets,
+  staticImageUrl,
   backgroundUrl,
   backgroundColor,
   className,
@@ -120,15 +124,17 @@ export function SpriteViewer({
     prevVehicleRef.current = vehicleKey;
     if (prevKeyRef.current === cacheKey) return;
     prevKeyRef.current = cacheKey;
-    if (vehicleChanged) {
+    if (vehicleChanged || staticImageUrl) {
       // Cambio de VEHÍCULO: la transición es el crossfade del AnimatePresence
       // de abajo, no el barrido de color — se cancela cualquier barrido en
-      // curso para no barrer entre vehículos distintos.
+      // curso para no barrer entre vehículos distintos. Con foto estática
+      // (Interior) tampoco hay barrido: sin frames que esperar, quedaría
+      // colgado en "preload" y dejaría la rotación bloqueada para siempre.
       setWipe(null);
       return;
     }
     if (lastSetRef.current) setWipe({ fromSet: lastSetRef.current, phase: "preload" });
-  }, [cacheKey, vehicleKey]);
+  }, [cacheKey, vehicleKey, staticImageUrl]);
 
   // Declarado DESPUÉS del efecto de arriba a propósito: ambos corren tras el
   // mismo render y aquel necesita leer todavía el set del render anterior.
@@ -200,8 +206,25 @@ export function SpriteViewer({
               que el héroe (overflow-hidden) absorbe. En desktop queda 1:1.
               Va en un div PROPIO (no en las capas motion.img del barrido):
               framer-motion pisa el transform de los elementos que anima. */}
-          <div className="flex h-full w-full origin-bottom scale-[1.25] items-end justify-center lg:scale-100">
-          {unavailable ? (
+          <div
+            className={cn(
+              "flex h-full w-full items-end justify-center",
+              // El zoom mobile aplica solo al sprite 360°: la foto interior
+              // estática se muestra completa, sin recorte por scale.
+              !staticImageUrl && "origin-bottom scale-[1.25] lg:scale-100"
+            )}
+          >
+          {staticImageUrl ? (
+            // Vista INTERIOR con foto única: estática, centrada y completa
+            // (sin rotación — los gestos de giro no tienen efecto visible).
+            // eslint-disable-next-line @next/next/no-img-element -- foto servida directo desde /public
+            <img
+              src={staticImageUrl}
+              alt="Vista interior del vehículo"
+              draggable={false}
+              className="pointer-events-none max-h-full max-w-full self-center object-contain"
+            />
+          ) : unavailable ? (
             <div className="relative flex h-[70%] max-w-[100%] translate-y-[6%] items-center justify-center lg:h-full lg:max-w-[82%]">
               {/* eslint-disable-next-line @next/next/no-img-element -- silueta compartida servida directo */}
               <img

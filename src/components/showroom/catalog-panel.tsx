@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import useEmblaCarousel from "embla-carousel-react";
 import type { Category, Vehicle } from "@/lib/types";
-import { iconAssetUrl, isVehicleAvailable } from "@/lib/mock-data";
+import { iconAssetUrl } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 /** "Ingresar al vehículo": flecha apuntando hacia una puerta de vehículo
  * (la puerta a la derecha, con ventanilla y manija; la flecha entra desde
  * la izquierda). Trazo con currentColor. Inline (no /assets/icons) por ser
- * UI pura: sin red ni precarga que mantener. */
-function EnterVehicleIcon({ className }: { className?: string }) {
+ * UI pura: sin red ni precarga que mantener. Exportado: lo usa también el
+ * botón circular de ingreso que flota sobre el carro (showroom-app.tsx). */
+export function EnterVehicleIcon({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -269,31 +270,9 @@ function CategoryCarousel({
                       <p className="text-base font-bold leading-tight">{v.commercialName}</p>
                       <p className={cn("text-xs", isActive ? "text-white/80" : "text-[#6B7280]")}>{v.typeTag}</p>
                     </div>
-                    {/* Ícono "Ingresar" (flecha hacia la puerta del
-                        vehículo) — SOLO en la card activa y con vehículo
-                        disponible: BLANCO, sin fondo, CENTRADO en la card.
-                        En mobile un TAP sobre él entra directo a los
-                        controles del visualizador (stopPropagation: no
-                        re-dispara la selección); en desktop quien confirma
-                        es el DOBLE clic, que burbujea hasta el
-                        onDoubleClick de la card — un clic simple ahí solo
-                        re-selecciona la misma card. */}
-                    {isActive && isVehicleAvailable(v) && (
-                      <span
-                        role="button"
-                        aria-label="Ingresar al vehículo"
-                        title="Ingresar"
-                        onClick={(e) => {
-                          if (!window.matchMedia("(min-width: 1024px)").matches) {
-                            e.stopPropagation();
-                            onConfirmVehicle();
-                          }
-                        }}
-                        className="group absolute left-1/2 top-1/2 z-20 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center text-white/75"
-                      >
-                        <EnterVehicleIcon className="h-14 w-14 drop-shadow-md transition-transform group-hover:scale-110" />
-                      </span>
-                    )}
+                    {/* El ícono de ingreso ya NO vive en la card: es el
+                        botón circular que flota sobre el carro del héroe
+                        (showroom-app.tsx). */}
                     {/* Vehículo grande recortado por el borde derecho de la
                         tarjeta (overflow-hidden): solo se ve ~la mitad, fiel
                         al Figma. `max-w-none` evita que el contenedor lo
