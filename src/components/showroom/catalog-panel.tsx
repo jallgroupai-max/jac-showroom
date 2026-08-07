@@ -4,8 +4,34 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import useEmblaCarousel from "embla-carousel-react";
 import type { Category, Vehicle } from "@/lib/types";
-import { iconAssetUrl } from "@/lib/mock-data";
+import { iconAssetUrl, isVehicleAvailable } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+
+/** Puerta de vehículo (trazo, hereda color) — glifo del badge "Ingresar" de
+ * la card activa. Inline (no /assets/icons) por ser UI pura: sin red ni
+ * precarga que mantener. */
+function CarDoorIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      {/* Contorno: borde superior inclinado (marco de la ventanilla). */}
+      <path d="M20 20H5a1 1 0 0 1-1-1v-8.6a2 2 0 0 1 .6-1.5l5-4.3A2 2 0 0 1 11.9 5H19a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1Z" />
+      {/* Línea de la ventanilla. */}
+      <path d="M4.3 11.5H20" />
+      <path d="M11.5 5.4v6.1" />
+      {/* Manija. */}
+      <path d="M8 15h4" />
+    </svg>
+  );
+}
 
 interface CatalogPanelProps {
   categories: Category[];
@@ -231,7 +257,9 @@ function CategoryCarousel({
                     // vehículo — el doble clic solo confirma y cierra.
                     onDoubleClick={onConfirmVehicle}
                     className={cn(
-                      "relative flex h-[230px] w-full flex-col justify-between overflow-hidden rounded-2xl p-4 text-left transition-colors duration-300 sm:h-[180px] lg:h-[180px]",
+                      // cursor-pointer SIEMPRE al hacer hover sobre una card
+                      // (pisa el cursor-grab del viewport del carrusel).
+                      "relative flex h-[230px] w-full cursor-pointer flex-col justify-between overflow-hidden rounded-2xl p-4 text-left transition-colors duration-300 sm:h-[180px] lg:h-[180px]",
                       isActive ? "bg-[#5D95B7] text-white" : "bg-[#FBFBFB] text-[#12141A]"
                     )}
                   >
@@ -239,6 +267,30 @@ function CategoryCarousel({
                       <p className="text-base font-bold leading-tight">{v.commercialName}</p>
                       <p className={cn("text-xs", isActive ? "text-white/80" : "text-[#6B7280]")}>{v.typeTag}</p>
                     </div>
+                    {/* Badge "Ingresar" (puerta de vehículo) — SOLO en la
+                        card activa y con vehículo disponible. En mobile un
+                        TAP sobre el badge entra directo a los controles del
+                        visualizador (stopPropagation: no re-dispara la
+                        selección); en desktop quien confirma es el DOBLE
+                        clic, que burbujea hasta el onDoubleClick de la card
+                        — un clic simple ahí no hace nada raro (re-selecciona
+                        la misma card). */}
+                    {isActive && isVehicleAvailable(v) && (
+                      <span
+                        role="button"
+                        aria-label="Ingresar al vehículo"
+                        title="Ingresar"
+                        onClick={(e) => {
+                          if (!window.matchMedia("(min-width: 1024px)").matches) {
+                            e.stopPropagation();
+                            onConfirmVehicle();
+                          }
+                        }}
+                        className="absolute right-2 top-2 z-20 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/95 text-[#12141A] shadow-md transition-transform hover:scale-110"
+                      >
+                        <CarDoorIcon className="h-5 w-5" />
+                      </span>
+                    )}
                     {/* Vehículo grande recortado por el borde derecho de la
                         tarjeta (overflow-hidden): solo se ve ~la mitad, fiel
                         al Figma. `max-w-none` evita que el contenedor lo
