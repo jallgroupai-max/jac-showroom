@@ -45,7 +45,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
         )}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- logo servido directo desde /public */}
-        <img src="/assets/logo-navbar.png" alt="JAC" className="h-6 w-auto shrink-0" />
+        <img src="/assets/logo-navbar.webp" alt="JAC" className="h-6 w-auto shrink-0" />
         <span className="truncate text-sm font-semibold text-[#12141A] sm:text-base">{title}</span>
       </div>
       <div className="pointer-events-auto hidden items-center gap-2 lg:flex">

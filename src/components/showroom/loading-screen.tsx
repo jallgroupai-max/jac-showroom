@@ -15,7 +15,7 @@ import {
 
 /** Logo para el Loading — con fallback al texto "JAC" si el archivo aún no
  * existe en /public (mismo estilo que el logo de texto del header). */
-const LOGO_URL = "/assets/logo.png";
+const LOGO_URL = "/assets/logo.webp";
 
 interface LoadingScreenProps {
   /** Vehículo inicial — se precargan TODOS sus colores antes de entrar. */
@@ -138,7 +138,7 @@ export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-[#F4F6F9] px-6 text-center">
       {logoFailed ? (
-        // Aún sin arte final en /assets/logo.png: texto con el mismo estilo
+        // Aún sin arte final en /assets/logo.webp: texto con el mismo estilo
         // que el logo del header.
         <span className="text-2xl font-black italic tracking-tighter text-[#12141A]">JAC</span>
       ) : (

@@ -6,13 +6,13 @@ import type { Category, PointOfInterest, Quality, Scene, SpecGroup, SpriteSet, V
 /**
  * Convención de assets 360°: public/assets/models/{modelo}/{color}/{quality}
  * con frames 0001..0036.webp. Un vehículo SIN `model` no tiene set 360° —
- * el visualizador muestra la silueta compartida (/assets/shadow.png) con el
+ * el visualizador muestra la silueta compartida (/assets/shadow.webp) con el
  * aviso "Vehículo no disponible".
  */
 const MODELS_BASE = "/assets/models";
 
 /** Imagen de silueta compartida para vehículos sin modelo 360°. */
-export const UNAVAILABLE_VEHICLE_IMAGE = "/assets/shadow.png";
+export const UNAVAILABLE_VEHICLE_IMAGE = "/assets/shadow.webp";
 
 /** Carpeta de sprites por color de carrocería con set 360° disponible. */
 const COLOR_SPRITE_SLUGS: Record<string, string> = {
@@ -181,7 +181,7 @@ export const VEHICLES: Vehicle[] = [
     // (blanco/negro/azul/rojo) viven en /assets/models/elite. Su card del
     // catálogo usa la foto real; las muestras de color salen del sprite.
     model: "elite",
-    cardImageUrl: "/assets/vehicles/elite.png",
+    cardImageUrl: "/assets/vehicles/elite.webp",
     specGroups: AVENTURA_4X4_SPECS,
   }),
   makeVehicle({
@@ -194,7 +194,7 @@ export const VEHICLES: Vehicle[] = [
     order: 1,
     featureIcons: ["gasoil-car"],
     colors: [{ name: "Rojo", hex: BODY_COLORS.Rojo }],
-    cardImageUrl: "/assets/vehicles/gx7.png",
+    cardImageUrl: "/assets/vehicles/gx7.webp",
   }),
   // ——— SUV ———
   makeVehicle({
@@ -207,7 +207,7 @@ export const VEHICLES: Vehicle[] = [
     order: 0,
     featureIcons: ["gasoil-car"],
     colors: [{ name: "Blanco", hex: BODY_COLORS.Blanco }],
-    cardImageUrl: "/assets/vehicles/nevado-manual.png",
+    cardImageUrl: "/assets/vehicles/nevado-manual.webp",
   }),
   makeVehicle({
     slug: "tepuy-pro",
@@ -219,7 +219,7 @@ export const VEHICLES: Vehicle[] = [
     order: 1,
     featureIcons: ["gasoil-car"],
     colors: [{ name: "Blanco", hex: BODY_COLORS.Blanco }],
-    cardImageUrl: "/assets/vehicles/tepuy-pro.png",
+    cardImageUrl: "/assets/vehicles/tepuy-pro.webp",
   }),
   makeVehicle({
     slug: "savanna",
@@ -231,7 +231,7 @@ export const VEHICLES: Vehicle[] = [
     order: 2,
     featureIcons: ["gasoil-car"],
     colors: [{ name: "Negro", hex: BODY_COLORS.Negro }],
-    cardImageUrl: "/assets/vehicles/savanna.png",
+    cardImageUrl: "/assets/vehicles/savanna.webp",
   }),
   makeVehicle({
     slug: "arena-pro",
@@ -243,7 +243,7 @@ export const VEHICLES: Vehicle[] = [
     order: 3,
     featureIcons: ["gasoil-car"],
     colors: [{ name: "Blanco", hex: BODY_COLORS.Blanco }],
-    cardImageUrl: "/assets/vehicles/arena-pro.png",
+    cardImageUrl: "/assets/vehicles/arena-pro.webp",
   }),
   makeVehicle({
     slug: "arena-jac-sport",
@@ -255,7 +255,7 @@ export const VEHICLES: Vehicle[] = [
     order: 4,
     featureIcons: ["gasoil-car"],
     colors: [{ name: "Negro", hex: BODY_COLORS.Negro }],
-    cardImageUrl: "/assets/vehicles/arena-jac-sport.png",
+    cardImageUrl: "/assets/vehicles/arena-jac-sport.webp",
   }),
   // ——— Pickups ———
   makeVehicle({
@@ -269,7 +269,7 @@ export const VEHICLES: Vehicle[] = [
     // Combinación de tipos: 4x4 + diésel.
     featureIcons: ["4x4-car", "diesel-car"],
     colors: [{ name: "Azul", hex: BODY_COLORS.Azul }],
-    cardImageUrl: "/assets/vehicles/la-venezolana-pro.png",
+    cardImageUrl: "/assets/vehicles/la-venezolana-pro.webp",
   }),
   // ——— Comercial ———
   makeVehicle({
@@ -282,7 +282,7 @@ export const VEHICLES: Vehicle[] = [
     order: 0,
     featureIcons: ["diesel-car"],
     colors: [{ name: "Blanco", hex: BODY_COLORS.Blanco }],
-    cardImageUrl: "/assets/vehicles/sunray-v6-carga.png",
+    cardImageUrl: "/assets/vehicles/sunray-v6-carga.webp",
   }),
 ];
 
@@ -331,7 +331,7 @@ export function getPreloadAssetUrls(): string[] {
   urls.add(UNAVAILABLE_VEHICLE_IMAGE);
   // Logos (pantalla de carga y navbar) — retenidos para que el header
   // aparezca completo al instante al entrar.
-  urls.add("/assets/logo.png");
-  urls.add("/assets/logo-navbar.png");
+  urls.add("/assets/logo.webp");
+  urls.add("/assets/logo-navbar.webp");
   return [...urls];
 }
