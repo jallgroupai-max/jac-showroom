@@ -52,7 +52,11 @@ export function CatalogPanel({
   onConfirmVehicle,
 }: CatalogPanelProps) {
   return (
-    <div className="relative flex h-full flex-col items-center gap-5 overflow-hidden px-4 pb-4 pt-5 sm:pt-6 lg:px-0 lg:pt-30">
+    // Sin overflow-hidden en el root: el carrusel de abajo es full-bleed
+    // (w-screen con margen negativo) y un overflow acá lo recortaría al
+    // ancho del panel — el recorte horizontal real lo hace el viewport del
+    // propio carrusel (y el root de la app, que ya es overflow-hidden).
+    <div className="relative flex h-full flex-col items-center gap-5 px-4 pb-4 pt-5 sm:pt-6 lg:px-0 lg:pt-30">
       {/* Encabezado: apilado y centrado en mobile; en desktop una sola fila
           del ancho del carrusel (1160px) con el título a la IZQUIERDA y las
           pestañas de categoría centradas, ambos a la misma altura. */}
@@ -187,10 +191,12 @@ function CategoryCarousel({
 
   return (
     <div className="relative h-full w-full">
-      {/* En desktop el viewport del carrusel mide exactamente 5 slides
-          (5 × 232px) centrado — nunca se ve una sexta tarjeta. */}
+      {/* Viewport FULL-BLEED: ocupa el 100% del ancho de la PANTALLA en
+          todos los tamaños (w-screen + margen negativo para romper el
+          padding del panel, mismo truco que el carrusel de colores) — las
+          tarjetas van de extremo a extremo, recortadas por los bordes. */}
       <div
-        className="h-full w-full cursor-grab overflow-hidden active:cursor-grabbing lg:mx-auto lg:w-[1160px] lg:max-w-full"
+        className="ml-[calc(50%-50vw)] h-full w-screen cursor-grab overflow-hidden active:cursor-grabbing"
         ref={emblaRef}
       >
         <div className="flex h-full items-center">
