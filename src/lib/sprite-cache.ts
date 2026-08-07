@@ -165,6 +165,41 @@ export async function preloadStaticAssets(
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, Math.max(1, total)) }, () => worker()));
 }
 
+// ——— Frames decodificados en memoria ———
+// El caché HTTP conserva los BYTES de cada frame, pero el bitmap DECODIFICADO
+// se descarta si ningún elemento lo referencia: al girar, cada frame nuevo se
+// re-decodificaba en el hilo principal — ese lag hacía sentir el 360 "pegado"
+// y provocaba saltos de varios frames al ponerse al día. Mantener vivos los
+// HTMLImageElement ya decode()ados de los sets en uso hace el pintado
+// instantáneo. Tope acotado (LRU) para no acumular los bitmaps de todos los
+// colores/calidades visitados en la sesión.
+const MAX_WARM_SETS = 3;
+const warmSets = new Map<string, HTMLImageElement[]>();
+
+export function warmDecodedFrames(setKey: string, spriteSet: SpriteSet): void {
+  const existing = warmSets.get(setKey);
+  if (existing) {
+    // Ya calentado: solo refresca su recencia en la cola LRU.
+    warmSets.delete(setKey);
+    warmSets.set(setKey, existing);
+    return;
+  }
+  const imgs: HTMLImageElement[] = [];
+  warmSets.set(setKey, imgs);
+  while (warmSets.size > MAX_WARM_SETS) {
+    const oldest = warmSets.keys().next().value;
+    if (oldest === undefined || oldest === setKey) break;
+    warmSets.delete(oldest);
+  }
+  for (let frame = 1; frame <= FRAME_COUNT; frame++) {
+    const img = new window.Image();
+    img.src = spriteSet.frameUrl(frame);
+    // decode() rechaza p. ej. ante un 404 — nunca romper la experiencia.
+    img.decode().catch(() => {});
+    imgs.push(img);
+  }
+}
+
 export function spriteCacheKey(vehicleSlug: string, variantOrMode: string): string {
   return `${vehicleSlug}:${variantOrMode}`;
 }

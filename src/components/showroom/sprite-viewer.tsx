@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Minus, Plus, RotateCcw, RotateCw } from "lucide-react";
 import type { SpriteSet } from "@/lib/types";
 import { UNAVAILABLE_VEHICLE_IMAGE } from "@/lib/mock-data";
+import { FRAME_COUNT, warmDecodedFrames } from "@/lib/sprite-cache";
 import { MAX_SCALE, useVehicleViewer } from "@/hooks/use-vehicle-viewer";
 import { useSpriteQuality } from "@/hooks/use-sprite-quality";
 import { SceneBackground } from "./scene-background";
@@ -103,6 +104,13 @@ export function SpriteViewer({
   }, [bestQuality, spriteSets]);
   const frameUrl = activeSet ? activeSet.frameUrl(frame) : null;
 
+  // Pre-decodifica y mantiene vivos los frames del set activo (ver
+  // warmDecodedFrames): sin esto, girar re-decodificaba cada frame en el
+  // hilo principal — el 360 se sentía pegado y daba saltos al recuperarse.
+  useEffect(() => {
+    if (activeSet) warmDecodedFrames(`${cacheKey}:${activeSet.quality}`, activeSet);
+  }, [activeSet, cacheKey]);
+
   const prevKeyRef = useRef(cacheKey);
   const prevVehicleRef = useRef(vehicleKey);
   const lastSetRef = useRef<SpriteSet | null>(null);
@@ -198,7 +206,7 @@ export function SpriteViewer({
                 Vehículo no disponible
               </p>
             </div>
-          ) : frameUrl ? (
+          ) : activeSet && frameUrl ? (
             wipe ? (
               <>
                 {/* Capa saliente (color anterior): SÓLIDA mientras el barrido
@@ -242,14 +250,34 @@ export function SpriteViewer({
                 />
               </>
             ) : (
-              // Sin transición en curso: una sola capa con el color activo.
-              // eslint-disable-next-line @next/next/no-img-element -- secuencia de frames servida directo, no encaja con next/image
-              <img
-                src={frameUrl}
-                alt="Vista del vehículo"
-                draggable={false}
-                className="pointer-events-none h-[75%] max-w-[100%] object-contain drop-shadow-2xl lg:h-full lg:max-w-[82%]"
-              />
+              // Sin transición en curso: los 36 frames del set activo viven
+              // APILADOS en el DOM y girar solo alterna cuál es visible —
+              // swapear el src de un único <img> obligaba al navegador a
+              // re-decodificar la imagen en cada frame, y ese lag hacía que
+              // el 360 se sintiera pegado y luego saltara varios frames de
+              // golpe al ponerse al día.
+              <div className="pointer-events-none relative h-[75%] max-w-[100%] drop-shadow-2xl lg:h-full lg:max-w-[82%]">
+                {Array.from({ length: FRAME_COUNT }, (_, i) => i + 1).map((n) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- secuencia de frames servida directo, no encaja con next/image
+                  <img
+                    key={n}
+                    src={activeSet.frameUrl(n)}
+                    alt={n === frame ? "Vista del vehículo" : ""}
+                    aria-hidden={n !== frame}
+                    draggable={false}
+                    className={cn(
+                      // El frame 1 fluye normal y le da su tamaño al
+                      // contenedor; el resto se apila encima ocupándolo por
+                      // completo (todos los frames de un set comparten
+                      // dimensiones).
+                      n === 1
+                        ? "h-full w-auto max-w-full object-contain"
+                        : "absolute inset-0 h-full w-full object-contain",
+                      n !== frame && "invisible"
+                    )}
+                  />
+                ))}
+              </div>
             )
           ) : (
             <div className="h-16 w-16 animate-pulse rounded-full bg-white/40" aria-hidden />
