@@ -75,6 +75,14 @@ export const SCENES: Scene[] = [
   { id: "dark", label: "Oscuro", imageUrl: "/assets/backgrounds/dark.jpeg" },
 ];
 
+/** Fondos PERSONALIZADOS — se eligen desde el modal del lápiz (junto a las
+ * escenas Claro/Oscuro). Al activarse uno, Claro/Oscuro quedan sin
+ * selección; volver a Claro (el default) restaura el comportamiento normal. */
+export const CUSTOM_SCENES: Scene[] = [
+  { id: "medanos-de-coro", label: "Médanos de Coro", imageUrl: "/assets/backgrounds/medanos-de-coro.webp" },
+  { id: "camino-de-la-felicidad", label: "El camino de la felicidad", imageUrl: "/assets/backgrounds/camino-de-la-felicidad.webp" },
+];
+
 const AVENTURA_4X4_SPECS: SpecGroup[] = [
   {
     title: "ESPECIFICACIONES",
@@ -337,7 +345,7 @@ export function getPreloadAssetUrls(): string[] {
     urls.add(v.ownBackgroundUrl);
     if (v.interior.imageUrl) urls.add(v.interior.imageUrl);
   }
-  for (const scene of SCENES) {
+  for (const scene of [...SCENES, ...CUSTOM_SCENES]) {
     if (scene.imageUrl) urls.add(scene.imageUrl);
   }
   urls.add(UNAVAILABLE_VEHICLE_IMAGE);

@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import useEmblaCarousel from "embla-carousel-react";
+import { Pencil } from "lucide-react";
 import type { Scene, Vehicle, ViewMode } from "@/lib/types";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface VisualizerControlsProps {
@@ -13,6 +15,8 @@ interface VisualizerControlsProps {
   activeVariantId: string;
   onVariantChange: (variantId: string) => void;
   scenes: Scene[];
+  /** Fondos personalizados — se eligen desde el modal del lápiz. */
+  customScenes: Scene[];
   activeSceneId: Scene["id"];
   onSceneChange: (sceneId: Scene["id"]) => void;
   onChangeVehicle: () => void;
@@ -69,12 +73,17 @@ export function VisualizerControls({
   activeVariantId,
   onVariantChange,
   scenes,
+  customScenes,
   activeSceneId,
   onSceneChange,
   onChangeVehicle,
 }: VisualizerControlsProps) {
   const disabled = viewMode === "interior";
   const [hoveredSceneId, setHoveredSceneId] = useState<string | null>(null);
+  // Modal del lápiz (fondos personalizados). Con uno activo, Claro/Oscuro
+  // quedan SIN selección — volver a Claro restaura el comportamiento normal.
+  const [customSceneModalOpen, setCustomSceneModalOpen] = useState(false);
+  const isCustomSceneActive = customScenes.some((s) => s.id === activeSceneId);
 
   // Solo escenas de imagen (Claro/Oscuro) — las de color sólido ya no
   // existen como opción (se retiró el botón de color personalizado).
@@ -334,8 +343,65 @@ export function VisualizerControls({
               </button>
             </div>
           ))}
+
+          {/* Fondo PERSONALIZADO — botón con lápiz al lado de Claro/Oscuro:
+              abre el modal de fondos. Mismo tamaño/anillo que las escenas;
+              se marca activo (borde azul) cuando el fondo vigente es uno
+              personalizado. */}
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setCustomSceneModalOpen(true)}
+            aria-label="Fondo personalizado"
+            title="Fondo personalizado"
+            className={cn(
+              "relative flex h-[35px] w-[35px] cursor-pointer items-center justify-center rounded-full border-2 bg-white text-[#12141A] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#111318] focus-visible:ring-offset-2 lg:h-7 lg:w-7",
+              isCustomSceneActive ? "scale-110" : "border-black/10"
+            )}
+            style={{ borderColor: isCustomSceneActive ? ACTIVE_SCENE_BLUE : undefined }}
+          >
+            <Pencil className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+          </button>
         </div>
       </div>
+
+      {/* Modal de fondos personalizados (fondo blanco): clic en uno lo
+          aplica como escena — Claro/Oscuro quedan deseleccionados — y
+          cierra el modal. */}
+      <Dialog open={customSceneModalOpen} onOpenChange={setCustomSceneModalOpen}>
+        <DialogContent className="max-w-md rounded-3xl bg-white p-6">
+          <DialogTitle className="text-base font-extrabold text-[#12141A]">
+            Fondos personalizados
+          </DialogTitle>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            {customScenes.map((scene) => (
+              <button
+                key={scene.id}
+                type="button"
+                onClick={() => {
+                  onSceneChange(scene.id);
+                  setCustomSceneModalOpen(false);
+                }}
+                className={cn(
+                  "cursor-pointer overflow-hidden rounded-2xl border-2 text-left transition-transform hover:scale-[1.02]",
+                  scene.id === activeSceneId ? "border-[#1E3A8A]" : "border-black/10"
+                )}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- fondo servido directo desde /public */}
+                <img
+                  src={scene.imageUrl}
+                  alt={scene.label}
+                  draggable={false}
+                  className="h-24 w-full object-cover"
+                />
+                <span className="block px-3 py-2 text-xs font-semibold text-[#12141A]">
+                  {scene.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

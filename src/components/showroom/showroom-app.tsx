@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { Scene, ViewMode } from "@/lib/types";
 import {
   CATEGORIES,
+  CUSTOM_SCENES,
   DEFAULT_VEHICLE_SLUG,
   SCENES,
   getVehicleBySlug,
@@ -137,7 +138,8 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   // (Photo Sphere Viewer) en lugar del sprite exterior.
   const interiorImageUrl = effectiveViewMode === "interior" ? vehicle.interior.imageUrl : undefined;
   const cacheKey = spriteCacheKey(vehicle.slug, effectiveViewMode === "exterior" ? activeVariantId : "interior");
-  const activeScene = sceneId === "own" ? undefined : SCENES.find((s) => s.id === sceneId);
+  const activeScene =
+    sceneId === "own" ? undefined : [...SCENES, ...CUSTOM_SCENES].find((s) => s.id === sceneId);
   const backgroundColor = activeScene?.color;
   const backgroundUrl = backgroundColor ? undefined : (activeScene?.imageUrl ?? vehicle.ownBackgroundUrl);
 
@@ -336,6 +338,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
                 activeVariantId={activeVariantId}
                 onVariantChange={setActiveVariantId}
                 scenes={SCENES}
+                customScenes={CUSTOM_SCENES}
                 activeSceneId={sceneId}
                 onSceneChange={setSceneId}
                 onChangeVehicle={() => setSubPhase("catalog")}
