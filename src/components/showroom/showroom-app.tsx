@@ -22,7 +22,6 @@ import { PointsOfInterest } from "./points-of-interest";
 import { SpecsPanel } from "./specs-panel";
 import { LeadForm } from "./lead-form";
 import { LeadConfirmation } from "./lead-confirmation";
-import { cn } from "@/lib/utils";
 
 type SubPhase = "catalog" | "visualizer";
 
@@ -83,7 +82,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const [leadFormOpen, setLeadFormOpen] = useState(false);
   const [leadConfirmationOpen, setLeadConfirmationOpen] = useState(false);
   // El hint de "arrastra para rotar" parpadea hasta la PRIMERA rotación de la
-  // sesión (cualquier vehículo) — después queda estático.
+  // sesión (cualquier vehículo) — al comenzar a rotar DESAPARECE (fade out).
   const [hasRotated, setHasRotated] = useState(false);
 
   // Sincronización con matchMedia vía useSyncExternalStore (patrón
@@ -282,16 +281,25 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               <div className="relative hidden items-center gap-3 lg:flex">
                 <PointsOfInterest points={vehicle.pointsOfInterest} mode={viewMode} />
                 {/* Centrado absoluto respecto al ancho completo de la fila —
-                    los POI de la izquierda no lo desplazan del centro. */}
-                <div
-                  className={cn(
-                    "pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm",
-                    !hasRotated && "animate-pulse"
+                    los POI de la izquierda no lo desplazan del centro.
+                    PARPADEA (opacity 0.2 <-> 1, mismo ritmo que el Loading)
+                    y con la primera rotación desaparece con un fade — el
+                    transition del exit pisa el repeat Infinity del parpadeo,
+                    si no el fade de salida no terminaría nunca. */}
+                <AnimatePresence>
+                  {!hasRotated && (
+                    <motion.div
+                      initial={false}
+                      animate={{ opacity: [0.2, 1, 0.2] }}
+                      exit={{ opacity: 0, transition: { duration: 0.3, ease: "easeOut", repeat: 0 } }}
+                      transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                      className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm"
+                    >
+                      Haz clic y arrastra para rotar{" "}
+                      <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
+                    </motion.div>
                   )}
-                >
-                  Haz clic y arrastra para rotar{" "}
-                  <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
-                </div>
+                </AnimatePresence>
               </div>
               <VisualizerControls
                 vehicle={vehicle}
