@@ -31,7 +31,8 @@ interface HeaderProps {
  * En mobile/tablet (<lg, no negociable) no hay botones — ni pantalla
  * completa ni "Me Interesa" (ese CTA vive en su propia barra, en flujo
  * normal debajo del catálogo/controles, en showroom-app.tsx) — solo logo +
- * título, y el título ya no se oculta.
+ * título. Con `hideOnMobile` (pantalla completa activa) ni siquiera eso: el
+ * header entero desaparece por debajo de `lg`.
  */
 export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
   { title, onMeInteresa, isFullscreen, onToggleFullscreen, hideOnMobile },

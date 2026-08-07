@@ -5,6 +5,11 @@ import { useCallback, useState } from "react";
 interface UseFullscreenResult {
   isFullscreen: boolean;
   toggleFullscreen: () => void;
+  /** Fuerza a apagado — usado cuando el celular vuelve a vertical (ver
+   * showroom-app.tsx): "pantalla completa" solo tiene sentido en desktop o
+   * en mobile horizontal, así que al rotar de vuelta a portrait se
+   * desactiva sola. Idempotente: llamarla ya estando apagado no hace nada. */
+  exitFullscreen: () => void;
 }
 
 /**
@@ -17,5 +22,6 @@ interface UseFullscreenResult {
 export function useFullscreen(): UseFullscreenResult {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const toggleFullscreen = useCallback(() => setIsFullscreen((current) => !current), []);
-  return { isFullscreen, toggleFullscreen };
+  const exitFullscreen = useCallback(() => setIsFullscreen(false), []);
+  return { isFullscreen, toggleFullscreen, exitFullscreen };
 }

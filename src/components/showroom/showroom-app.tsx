@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Scene, ViewMode } from "@/lib/types";
 import {
@@ -103,7 +103,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   // que sí anima, con Framer Motion, es el alto que le reserva el wrapper
   // de abajo: headerHeight normal, 0 en pantalla completa — el héroe crece
   // detrás del header (que se vuelve transparente) en vez de saltar.
-  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreen();
   const headerRef = useRef<HTMLElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   // Posición del pointerdown sobre el héroe — distingue clic de arrastre
@@ -124,6 +124,20 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
     // apunta al nodo real. `useLayoutEffect` (no `useEffect`) para medir
     // antes del primer paint y que el spacer nunca arranque en 0 con flash.
   }, [phase]);
+
+  // "Pantalla completa" solo tiene botón para activarse en desktop o en
+  // mobile/tablet HORIZONTAL (ver sprite-viewer.tsx) — si el usuario rota el
+  // celular de vuelta a vertical estando en ese modo, se desactiva sola:
+  // portrait ya encaja todo en el 100dvh por diseño y no necesita (ni tiene
+  // cómo salir de) pantalla completa.
+  useEffect(() => {
+    const mql = window.matchMedia("(orientation: portrait)");
+    const onChange = () => {
+      if (mql.matches && !getDesktopSnapshot()) exitFullscreen();
+    };
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, [exitFullscreen]);
 
   const vehicle = getVehicleBySlug(activeVehicleSlug) ?? startVehicle;
   const variant = vehicle.variants.find((v) => v.id === activeVariantId) ?? vehicle.variants[0];
