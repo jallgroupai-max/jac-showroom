@@ -179,10 +179,11 @@ export function SpriteViewer({
             (congelada en su último frame) se desvanece mientras la del nuevo
             aparece — el fondo de escena NO participa del fade, solo el
             vehículo (o la silueta de "no disponible").
-            bottom-[10%]: el vehículo se apoya en una "línea de piso" un 10%
-            por encima del borde inferior del héroe, para que no quede pegado
-            a los controles flotantes de abajo (va a la par del object-bottom
-            del fondo en scene-background.tsx). */}
+            Línea de piso: en mobile el vehículo se apoya casi en el borde
+            inferior del héroe (bottom-[3%], pedido: bajarlo); en desktop
+            queda un 10% por encima (lg:bottom-[10%]) para no pegarse a los
+            controles flotantes de abajo (a la par del fondo en
+            scene-background.tsx). */}
         <AnimatePresence initial={false}>
           <motion.div
             key={vehicleKey ?? "vehicle"}
@@ -190,7 +191,7 @@ export function SpriteViewer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="absolute inset-x-0 top-0 bottom-[10%] flex items-end justify-center"
+            className="absolute inset-x-0 top-0 bottom-[3%] flex items-end justify-center lg:bottom-[10%]"
           >
           {/* En mobile el vehículo se AGRANDA con un scale (origen abajo,
               apoyado en la línea de piso): en pantallas angostas el frame ya
