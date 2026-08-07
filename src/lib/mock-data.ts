@@ -129,8 +129,10 @@ function makeVehicle(partial: {
   model?: string;
   /** Imagen propia para la tarjeta del catálogo. */
   cardImageUrl?: string;
-  /** Foto única del interior (sin 360°) — habilita el toggle Interior. */
+  /** Panorámica 360° del interior (2:1) — habilita el toggle Interior. */
   interiorImageUrl?: string;
+  /** Variante mobile de la panorámica (≤4096px de ancho). */
+  interiorImageUrlMobile?: string;
   specGroups?: SpecGroup[];
 }): Vehicle {
   return {
@@ -166,10 +168,15 @@ function makeVehicle(partial: {
             thumbnailUrl: partial.cardImageUrl ?? UNAVAILABLE_VEHICLE_IMAGE,
           },
         ],
-    // Interior: foto única si el vehículo la tiene (hoy solo ÉLITE). Ya no
-    // se usa el set exterior Rojo como placeholder de sprites interiores —
-    // sin foto ni sprites, el toggle Interior queda deshabilitado.
-    interior: { sprites: [], imageUrl: partial.interiorImageUrl },
+    // Interior: panorámica 360° si el vehículo la tiene (hoy solo ÉLITE).
+    // Ya no se usa el set exterior Rojo como placeholder de sprites
+    // interiores — sin panorámica ni sprites, el toggle Interior queda
+    // deshabilitado.
+    interior: {
+      sprites: [],
+      imageUrl: partial.interiorImageUrl,
+      imageUrlMobile: partial.interiorImageUrlMobile,
+    },
     specGroups: partial.specGroups ?? [{ title: "ESPECIFICACIONES", items: [] }],
     warrantyLabel: "Garantía de 5 años / 100,000 km",
     pointsOfInterest: [...GENERIC_POI_EXTERIOR, ...GENERIC_POI_INTERIOR],
@@ -195,7 +202,8 @@ export const VEHICLES: Vehicle[] = [
     // catálogo usa la foto real; las muestras de color salen del sprite.
     model: "elite",
     cardImageUrl: "/assets/vehicles/elite.webp",
-    interiorImageUrl: "/assets/interiors/elite.webp",
+    interiorImageUrl: "/assets/interiors/elite-desktop.webp",
+    interiorImageUrlMobile: "/assets/interiors/elite-mobile.webp",
     specGroups: AVENTURA_4X4_SPECS,
   }),
   makeVehicle({
@@ -343,7 +351,15 @@ export function getPreloadAssetUrls(): string[] {
     for (const icon of v.featureIcons) urls.add(iconAssetUrl(icon));
     for (const poi of v.pointsOfInterest) urls.add(iconAssetUrl(poi.icon));
     urls.add(v.ownBackgroundUrl);
-    if (v.interior.imageUrl) urls.add(v.interior.imageUrl);
+    // Panorámica interior: SOLO la variante del dispositivo actual — la de
+    // desktop pesa varias veces la mobile y precargar ambas no aporta.
+    // (Esta función solo corre en el cliente, desde LoadingScreen.)
+    const desktopViewport =
+      typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches;
+    const interiorUrl = desktopViewport
+      ? v.interior.imageUrl
+      : (v.interior.imageUrlMobile ?? v.interior.imageUrl);
+    if (interiorUrl) urls.add(interiorUrl);
   }
   for (const scene of [...SCENES, ...CUSTOM_SCENES]) {
     if (scene.imageUrl) urls.add(scene.imageUrl);

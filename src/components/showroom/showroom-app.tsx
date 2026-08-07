@@ -134,9 +134,16 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const interiorAvailable = vehicle.interior.sprites.length > 0 || Boolean(vehicle.interior.imageUrl);
   const effectiveViewMode: ViewMode = interiorAvailable ? viewMode : "exterior";
   const spriteSets = effectiveViewMode === "exterior" ? variant.exteriorSprites : vehicle.interior.sprites;
-  // Interior con panorámica única: el viewer monta el visor 360°
-  // (Photo Sphere Viewer) en lugar del sprite exterior.
-  const interiorImageUrl = effectiveViewMode === "interior" ? vehicle.interior.imageUrl : undefined;
+  // Interior con panorámica única: el viewer monta el visor 360° (Photo
+  // Sphere Viewer) en lugar del sprite exterior. Cada dispositivo recibe SU
+  // variante: mobile ≤4096px (límite de textura de GPU móvil), desktop la
+  // de mayor resolución.
+  const interiorImageUrl =
+    effectiveViewMode === "interior"
+      ? isDesktop
+        ? vehicle.interior.imageUrl
+        : (vehicle.interior.imageUrlMobile ?? vehicle.interior.imageUrl)
+      : undefined;
   const cacheKey = spriteCacheKey(vehicle.slug, effectiveViewMode === "exterior" ? activeVariantId : "interior");
   const activeScene =
     sceneId === "own" ? undefined : [...SCENES, ...CUSTOM_SCENES].find((s) => s.id === sceneId);

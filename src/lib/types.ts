@@ -35,11 +35,14 @@ export interface VehicleVariant {
 export interface InteriorSprites {
   /** Sprites interior, uno por calidad. No tiene variantes de color. */
   sprites: SpriteSet[];
-  /** Alternativa a `sprites`: panorámica 360° equirectangular del interior,
-   * mostrada con Photo Sphere Viewer (interior-panorama.tsx). Con ambos
-   * vacíos, el vehículo NO tiene vista interior y el toggle
-   * Exterior/Interior queda deshabilitado. */
+  /** Alternativa a `sprites`: panorámica 360° equirectangular del interior
+   * (2:1 EXACTO), mostrada con Photo Sphere Viewer (interior-panorama.tsx).
+   * Con sprites e imageUrl vacíos, el vehículo NO tiene vista interior y el
+   * toggle Exterior/Interior queda deshabilitado. */
   imageUrl?: string;
+  /** Variante mobile de la panorámica (≤4096px de ancho — límite de textura
+   * de las GPU móviles). Si falta, se usa `imageUrl` también en mobile. */
+  imageUrlMobile?: string;
 }
 
 export interface SpecItem {

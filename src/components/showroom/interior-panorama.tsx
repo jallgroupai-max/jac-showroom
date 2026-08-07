@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Viewer } from "@photo-sphere-viewer/core";
+import { EquirectangularAdapter, Viewer } from "@photo-sphere-viewer/core";
 import "@photo-sphere-viewer/core/index.css";
 
 interface InteriorPanoramaProps {
@@ -32,6 +32,11 @@ export function InteriorPanorama({ imageUrl }: InteriorPanoramaProps) {
       defaultZoomLvl: 75,
       // Un dedo alcanza para mirar alrededor (igual que en Changan).
       touchmoveTwoFingers: false,
+      // La panorámica se lee SIEMPRE por su relación 2:1 (esfera completa),
+      // ignorando cualquier metadato XMP de recorte que traiga el archivo —
+      // con metadatos parciales la esfera no cerraba y quedaba una franja
+      // negra entre los extremos.
+      adapter: [EquirectangularAdapter, { useXmpData: false }],
     });
     return () => viewer.destroy();
   }, [imageUrl]);
