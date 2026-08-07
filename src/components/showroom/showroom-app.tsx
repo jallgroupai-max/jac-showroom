@@ -54,10 +54,10 @@ function getDesktopSnapshot(): boolean {
  *   controles ya visibles (modo "visualizador"), sin pasar primero por el
  *   selector de catálogo.
  *
- * Mobile/tablet (<1024px, no negociable — diseño distinto al de desktop):
- * - El héroe es una franja compacta de alto fijo (no `flex-1`/100vh) — la
- *   página completa hace scroll normal debajo de él, no todo encaja en un
- *   `h-dvh overflow-hidden` como en desktop.
+ * Mobile/tablet (<1024px, diseño distinto al de desktop):
+ * - TODO encaja en los 100dvh de la pantalla SIN scroll vertical (pedido
+ *   explícito): el héroe es flex-1 y absorbe el alto que dejan libre el
+ *   header, el catálogo/controles y el CTA "Me Interesa".
  * - Arranca en el selector de catálogo (sin cambios).
  * - Sin pod de girar/zoom, sin botones en el header (ni pantalla completa
  *   ni "Me Interesa") ni toolbar de POI — el CTA "Me Interesa" vive en una
@@ -167,7 +167,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col bg-[#F4F6F9] lg:h-dvh lg:overflow-hidden">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-[#F4F6F9]">
       <motion.div
         className="shrink-0"
         initial={false}
@@ -183,15 +183,15 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
         />
       </motion.div>
 
-      {/* Body/héroe — franja compacta de alto fijo en mobile/tablet (la
-          página hace scroll debajo); siempre flex-1 (100dvh - header) desde
-          desktop, donde los controles de abajo salen del flujo
-          (lg:absolute) y el héroe reclama todo el espacio libre.
+      {/* Body/héroe — flex-1 en TODOS los tamaños: absorbe el alto libre
+          para que la página completa encaje en 100dvh sin scroll vertical
+          (en desktop los controles de abajo salen del flujo con lg:absolute
+          y el héroe reclama todo el espacio).
           Con el selector de vehículos abierto, un CLIC fuera de esa sección
           (sobre el héroe) lo cierra y vuelve a los controles — con umbral de
           movimiento para que un arrastre de rotación no cuente como clic. */}
       <div
-        className="relative h-[38vh] shrink-0 overflow-hidden lg:h-auto lg:flex-1"
+        className="relative min-h-0 flex-1 overflow-hidden"
         onPointerDown={(e) => {
           heroPressRef.current = { x: e.clientX, y: e.clientY };
         }}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import useEmblaCarousel from "embla-carousel-react";
 import type { Category, Vehicle } from "@/lib/types";
 import { iconAssetUrl } from "@/lib/mock-data";
@@ -50,6 +51,83 @@ export function CatalogPanel({
   onSelectVehicle,
   onConfirmVehicle,
 }: CatalogPanelProps) {
+  return (
+    <div className="relative flex h-full flex-col items-center gap-5 overflow-hidden px-4 pb-4 pt-5 sm:pt-6 lg:px-0 lg:pt-30">
+      {/* Encabezado: apilado y centrado en mobile; en desktop una sola fila
+          del ancho del carrusel (1160px) con el título a la IZQUIERDA y las
+          pestañas de categoría centradas, ambos a la misma altura. */}
+      <div className="flex w-full flex-col items-center gap-5 lg:relative lg:mx-auto lg:w-[1160px] lg:max-w-full lg:flex-row lg:justify-center lg:gap-0">
+        {/* Título más grande en mobile/tablet; en desktop conserva su
+            tamaño original (text-2xl) y su posición absoluta a la izquierda. */}
+        <h2 className="text-2xl font-extrabold text-[#12141A] sm:text-3xl lg:absolute lg:left-3 lg:top-1/2 lg:-translate-y-1/2 lg:text-2xl">
+          Selecciona tu vehículo
+        </h2>
+
+        {/* Pestañas de categoría: en mobile/tablet ocupan TODO el ancho, con
+            padding y tipografía reducidos para que "Comercial" no desborde
+            su botón; en desktop vuelven a ajustarse a su contenido. */}
+        <div className="flex w-full items-center gap-1 rounded-full bg-white p-1 shadow-sm lg:w-auto">
+          {categories.map((c) => (
+            <button
+              key={c.slug}
+              type="button"
+              onClick={() => onCategoryChange(c.slug)}
+              className={cn(
+                "flex-1 whitespace-nowrap rounded-full px-1.5 py-2 text-[13px] font-semibold transition-colors sm:px-5 sm:text-sm lg:flex-none",
+                c.slug === activeCategorySlug ? "bg-[#111318] text-white" : "text-[#6B7280] hover:text-[#12141A]"
+              )}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Cambio de categoría: el carrusel saliente se desliza con fade hacia
+          la izquierda (la tarjeta activa "se traslada" hacia un lado junto
+          con el set viejo) y el set nuevo ENTRA con fade + slide desde el
+          lado opuesto (mode="wait": primero sale uno, después entra el
+          otro). El remount por key además recaptura el startIndex de Embla
+          para arrancar bien centrado en el set nuevo. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={activeCategorySlug}
+          initial={{ opacity: 0, x: 80 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -80 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="min-h-0 w-full flex-1"
+        >
+          {vehicles.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-[#6B7280]">
+              Próximamente en esta categoría.
+            </div>
+          ) : (
+            <CategoryCarousel
+              vehicles={vehicles}
+              activeVehicleSlug={activeVehicleSlug}
+              onSelectVehicle={onSelectVehicle}
+              onConfirmVehicle={onConfirmVehicle}
+            />
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * Carrusel de UNA categoría — componente propio para que el cambio de
+ * categoría lo REMONTE completo (key en CatalogPanel): Embla arranca de cero
+ * con el set nuevo (startIndex fresco) y la animación de entrada/salida no
+ * arrastra estado del set anterior.
+ */
+function CategoryCarousel({
+  vehicles,
+  activeVehicleSlug,
+  onSelectVehicle,
+  onConfirmVehicle,
+}: Pick<CatalogPanelProps, "vehicles" | "activeVehicleSlug" | "onSelectVehicle" | "onConfirmVehicle">) {
   const activeIndex = Math.max(0, vehicles.findIndex((v) => v.slug === activeVehicleSlug));
   // También con UN solo vehículo se repite el set (antes quedaba una única
   // tarjeta centrada con los lados vacíos): el carrusel debe mostrar SIEMPRE
@@ -86,15 +164,6 @@ export function CatalogPanel({
     };
   }, [emblaApi]);
 
-  // Cambio de categoría = otro set de tarjetas: salto instantáneo al inicio
-  // (es un cambio de contexto, no una selección — sin animación).
-  const prevCategoryRef = useRef(activeCategorySlug);
-  useEffect(() => {
-    if (prevCategoryRef.current === activeCategorySlug) return;
-    prevCategoryRef.current = activeCategorySlug;
-    emblaApi?.scrollTo(0, true);
-  }, [activeCategorySlug, emblaApi]);
-
   const scrollTimerRef = useRef<number | null>(null);
   useEffect(
     () => () => {
@@ -117,50 +186,14 @@ export function CatalogPanel({
   }
 
   return (
-    <div className="relative flex h-full flex-col items-center gap-5 overflow-hidden px-4 pb-4 pt-5 sm:pt-6 lg:px-0 lg:pt-30">
-      {/* Encabezado: apilado y centrado en mobile; en desktop una sola fila
-          del ancho del carrusel (1160px) con el título a la IZQUIERDA y las
-          pestañas de categoría centradas, ambos a la misma altura. */}
-      <div className="flex w-full flex-col items-center gap-5 lg:relative lg:mx-auto lg:w-[1160px] lg:max-w-full lg:flex-row lg:justify-center lg:gap-0">
-        {/* Título más grande en mobile/tablet; en desktop conserva su
-            tamaño original (text-2xl) y su posición absoluta a la izquierda. */}
-        <h2 className="text-2xl font-extrabold text-[#12141A] sm:text-3xl lg:absolute lg:left-3 lg:top-1/2 lg:-translate-y-1/2 lg:text-2xl">
-          Selecciona tu vehículo
-        </h2>
-
-        {/* Pestañas de categoría: en mobile/tablet ocupan el 90% del ancho
-            centradas (los botones se reparten el espacio en partes iguales);
-            en desktop vuelven a ajustarse a su contenido. */}
-        <div className="flex w-[90%] items-center gap-1 rounded-full bg-white p-1 shadow-sm lg:w-auto">
-        {categories.map((c) => (
-          <button
-            key={c.slug}
-            type="button"
-            onClick={() => onCategoryChange(c.slug)}
-            className={cn(
-              "flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors sm:px-5 lg:flex-none",
-              c.slug === activeCategorySlug ? "bg-[#111318] text-white" : "text-[#6B7280] hover:text-[#12141A]"
-            )}
-          >
-            {c.name}
-          </button>
-        ))}
-        </div>
-      </div>
-
-      {vehicles.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-[#6B7280]">
-          Próximamente en esta categoría.
-        </div>
-      ) : (
-        <div className="relative w-full flex-1">
-          {/* En desktop el viewport del carrusel mide exactamente 5 slides
-              (5 × 232px) centrado — nunca se ve una sexta tarjeta. */}
-          <div
-            className="h-full w-full cursor-grab overflow-hidden active:cursor-grabbing lg:mx-auto lg:w-[1160px] lg:max-w-full"
-            ref={emblaRef}
-          >
-            <div className="flex h-full items-center">
+    <div className="relative h-full w-full">
+      {/* En desktop el viewport del carrusel mide exactamente 5 slides
+          (5 × 232px) centrado — nunca se ve una sexta tarjeta. */}
+      <div
+        className="h-full w-full cursor-grab overflow-hidden active:cursor-grabbing lg:mx-auto lg:w-[1160px] lg:max-w-full"
+        ref={emblaRef}
+      >
+        <div className="flex h-full items-center">
               {loopVehicles.map((v, i) => {
                 // Posicional, no por slug: solo la copia centrada se pinta.
                 const isActive = i === centeredIndex;
@@ -227,10 +260,8 @@ export function CatalogPanel({
                   </div>
                 );
               })}
-            </div>
-          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
