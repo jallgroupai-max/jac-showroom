@@ -44,7 +44,8 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
           isFullscreen ? "bg-white/90 px-4 py-2 shadow-md backdrop-blur" : "px-0 py-0"
         )}
       >
-        <span className="shrink-0 text-xl font-black italic tracking-tighter text-[#12141A]">JAC</span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- logo servido directo desde /public */}
+        <img src="/assets/logo-navbar.png" alt="JAC" className="h-6 w-auto shrink-0" />
         <span className="truncate text-sm font-semibold text-[#12141A] sm:text-base">{title}</span>
       </div>
       <div className="pointer-events-auto hidden items-center gap-2 lg:flex">

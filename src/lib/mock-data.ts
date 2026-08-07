@@ -329,5 +329,9 @@ export function getPreloadAssetUrls(): string[] {
     if (scene.imageUrl) urls.add(scene.imageUrl);
   }
   urls.add(UNAVAILABLE_VEHICLE_IMAGE);
+  // Logos (pantalla de carga y navbar) — retenidos para que el header
+  // aparezca completo al instante al entrar.
+  urls.add("/assets/logo.png");
+  urls.add("/assets/logo-navbar.png");
   return [...urls];
 }

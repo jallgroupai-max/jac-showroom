@@ -145,9 +145,10 @@ export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
         // eslint-disable-next-line @next/next/no-img-element -- logo servido directo desde /public
         <img src={LOGO_URL} alt="JAC" className="h-12 w-auto" onError={() => setLogoFailed(true)} />
       )}
-      {/* Ambos rótulos PARPADEAN (opacity 0.2 <-> 1) mientras dura la carga
-          y desaparecen al llegar al 100% — con fade, y conservando su lugar
-          en el layout para que nada salte. */}
+      {/* "Iniciando servidores…" PARPADEA (opacity 0.2 <-> 1) mientras dura
+          la carga; "Loading" queda fijo. Ambos desaparecen al llegar al
+          100% — con fade, y conservando su lugar en el layout para que nada
+          salte. */}
       <motion.p
         animate={isReady ? { opacity: 0 } : { opacity: [0.2, 1, 0.2] }}
         transition={
@@ -161,12 +162,8 @@ export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
       </motion.p>
       <p className="mt-4 text-5xl font-extrabold text-[#12141A]">{percent}%</p>
       <motion.p
-        animate={isReady ? { opacity: 0 } : { opacity: [0.2, 1, 0.2] }}
-        transition={
-          isReady
-            ? { duration: 0.3, ease: "easeOut" }
-            : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }
-        }
+        animate={{ opacity: isReady ? 0 : 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
         className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#6B7280]"
       >
         Loading
