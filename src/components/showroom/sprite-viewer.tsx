@@ -170,10 +170,11 @@ export function SpriteViewer({
   if (panoramaUrl) {
     return (
       <div className={cn("relative h-full w-full", className)}>
-        {/* Ancho SIEMPRE al 100% (sin espacios a los lados); el alto es
-            proporcional a la pantalla (75% del héroe — porcentajes, nunca
-            píxeles fijos), recortado desde abajo. */}
-        <div className="absolute inset-x-0 top-0 bottom-[25%] overflow-hidden">
+        {/* Ancho SIEMPRE al 100% (sin espacios a los lados). Alto: 100% del
+            héroe en MOBILE (los controles van en flujo normal debajo, no se
+            superponen); en DESKTOP se recorta un 25% desde abajo para no
+            quedar debajo de los controles flotantes (lg:absolute). */}
+        <div className="absolute inset-x-0 top-0 bottom-0 overflow-hidden lg:bottom-[25%]">
           <InteriorPanorama imageUrl={panoramaUrl} />
         </div>
 

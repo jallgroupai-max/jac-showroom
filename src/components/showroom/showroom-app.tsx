@@ -184,13 +184,13 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   }
 
   return (
-    // h-dvh + overflow-y-auto (no overflow-hidden a secas): en portrait el
-    // héroe flex-1 absorbe todo el alto libre y normalmente no hace falta
-    // scrollear, pero en landscape mobile/tablet el contenido (héroe +
-    // controles + CTA) no entra en el poco alto disponible — sin el scroll
-    // de escape el usuario quedaba atrapado sin poder ver el botón "Me
-    // Interesa". En desktop (lg:) se mantiene bloqueado como siempre.
-    <div className="relative flex h-dvh flex-col overflow-y-auto bg-[#F4F6F9] lg:overflow-hidden">
+    // Portrait (mobile/tablet) y desktop: BLOQUEADO sin scroll — el héroe
+    // flex-1 absorbe exactamente el alto libre y todo encaja en el 100dvh.
+    // Landscape mobile/tablet (max-lg): el contenido (héroe + controles +
+    // CTA) no entra en el poco alto disponible — se habilita scroll vertical
+    // como escape, único caso donde el usuario podía quedar atrapado sin
+    // poder ver el botón "Me Interesa".
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-[#F4F6F9] max-lg:landscape:overflow-y-auto">
       <motion.div
         className="shrink-0"
         initial={false}
@@ -214,10 +214,11 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
           (sobre el héroe) lo cierra y vuelve a los controles — con umbral de
           movimiento para que un arrastre de rotación no cuente como clic. */}
       <div
-        // min-h-[45vh]: piso de alto para el héroe en mobile/tablet — sin
-        // esto, en landscape (poco alto disponible) el flex-1 lo aplastaba
-        // hasta casi desaparecer para hacerle lugar a los controles.
-        className="relative min-h-[45vh] flex-1 overflow-hidden lg:min-h-0"
+        // min-h-0 (base): el héroe se achica lo que haga falta para que TODO
+        // encaje en 100dvh sin scroll (portrait y desktop). Piso de 200px
+        // SOLO en landscape mobile/tablet (donde sí hay scroll de escape) —
+        // sin él, el flex-1 lo aplastaba hasta casi desaparecer.
+        className="relative min-h-0 flex-1 overflow-hidden max-lg:landscape:min-h-[200px]"
         onPointerDown={(e) => {
           heroPressRef.current = { x: e.clientX, y: e.clientY };
         }}
