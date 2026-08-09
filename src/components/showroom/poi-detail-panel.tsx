@@ -51,7 +51,10 @@ export function PoiDetailPanel({ poi, onClose, desktopBottomOffset }: PoiDetailP
         // elegir otro botón con el panel abierto). Solo la card interior
         // (más abajo) vuelve a activar los clics. `lg:top-auto` cancela el
         // `top-[45%]` de mobile: acá el alto lo da el propio contenido.
-        "lg:pointer-events-none lg:absolute lg:inset-x-0 lg:top-auto lg:bg-transparent lg:pl-8"
+        // `lg:pb-4` es un colchón mínimo por defecto (interior, sin
+        // `desktopBottomOffset`) para que la card no quede pegada al ras
+        // del borde inferior del héroe, encima de la barra de controles.
+        "lg:pointer-events-none lg:absolute lg:inset-x-0 lg:top-auto lg:bg-transparent lg:pb-4 lg:pl-8"
       )}
     >
       <div className="relative flex h-full w-full flex-col overflow-x-hidden overflow-y-auto rounded-t-3xl bg-white text-left shadow-2xl lg:pointer-events-auto lg:h-auto lg:max-w-md lg:flex-row lg:rounded-3xl">

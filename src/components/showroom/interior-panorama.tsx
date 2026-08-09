@@ -97,7 +97,18 @@ export function InteriorPanorama({ imageUrl, points, activeId, onSelectPoint }: 
     if (!plugin) return;
     for (const poi of points) {
       if (!poi.panoramaPosition) continue;
-      plugin.updateMarker({ id: poi.id, className: poi.id === activeId ? MARKER_ACTIVE_CLASS : undefined });
+      try {
+        plugin.updateMarker({ id: poi.id, className: poi.id === activeId ? MARKER_ACTIVE_CLASS : undefined });
+      } catch {
+        // El plugin registra los markers de forma asíncrona (recién cuando
+        // termina de cargar la panorámica) — este efecto puede correr ANTES
+        // de eso, apenas se monta, y updateMarker() tira si el marker
+        // todavía no existe (PSVError sin catch acá arriba tumbaba toda la
+        // app). No se pierde nada: el estado inicial ya se pasó al crear
+        // los markers más arriba, y cualquier cambio de activeId posterior
+        // solo puede venir de un clic sobre un marker que, para existir,
+        // ya tuvo que terminar de registrarse.
+      }
     }
   }, [activeId, points]);
 

@@ -398,16 +398,22 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             dos layouts vía CSS responsive: en mobile/tablet es una hoja fija
             topeada al 45% de la pantalla (pedido explícito) y estirada hasta
             el borde inferior; en desktop es la card de dos columnas flotando
-            SOBRE el fondo del héroe (el vehículo NO se mueve), pegada
-            justo arriba de la toolbar de puntos de interés — 20px de
-            separación (desktopPanelBottom, medido en vivo). */}
+            SOBRE el fondo del héroe (el vehículo NO se mueve). En exterior
+            queda pegada justo arriba de la toolbar de puntos de interés —
+            20px de separación (desktopPanelBottom, medido en vivo). En
+            interior esa toolbar no existe (los puntos de interés viven como
+            markers sobre la panorámica) — `desktopPanelBottom` se mide
+            SOLO mientras la toolbar está montada, así que pasarlo también
+            en interior dejaba un valor viejo (de cuando sí existía) que
+            empujaba el panel fuera de la pantalla — bug real, visto en
+            producción: el panel "no aparecía" al abrir un punto interior. */}
         <AnimatePresence>
           {activePoi && (
             <PoiDetailPanel
               key={activePoi.id}
               poi={activePoi}
               onClose={() => setActivePoiId(null)}
-              desktopBottomOffset={isDesktop ? desktopPanelBottom : undefined}
+              desktopBottomOffset={isDesktop && effectiveViewMode === "exterior" ? desktopPanelBottom : undefined}
             />
           )}
         </AnimatePresence>
