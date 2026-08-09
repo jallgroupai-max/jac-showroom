@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const FRAME_COUNT = 36;
 const DRAG_SENSITIVITY = 6; // px de arrastre por frame, sin zoom
+const AUTO_ROTATE_STEP_MS = 35; // velocidad del giro automático hacia goToFrame
 export const MIN_SCALE = 1;
 export const MAX_SCALE = 2.5;
 const ZOOM_STEP = 0.5; // botones +/- y teclado
@@ -31,6 +32,11 @@ interface UseVehicleViewerResult {
   isZoomed: boolean;
   containerRef: React.RefObject<HTMLDivElement | null>;
   rotateBy: (deltaFrames: number) => void;
+  /** Gira automáticamente hasta el frame indicado, por el camino más corto —
+   * usado al abrir un punto de interés (points-of-interest.tsx) para mostrar
+   * el vehículo desde el ángulo relevante. Cualquier gesto manual (drag,
+   * flechas, botones de girar) lo cancela. */
+  goToFrame: (frame: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
@@ -66,6 +72,7 @@ export function useVehicleViewer(initialFrame = 1, rotationLocked = false): UseV
   const [scale, setScale] = useState(MIN_SCALE);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [autoTarget, setAutoTarget] = useState<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, Point>());
@@ -92,10 +99,35 @@ export function useVehicleViewer(initialFrame = 1, rotationLocked = false): UseV
   const rotateBy = useCallback(
     (deltaFrames: number) => {
       if (rotationLocked) return;
+      setAutoTarget(null);
       setFrame((f) => wrapFrame(f + deltaFrames));
     },
     [rotationLocked]
   );
+
+  const goToFrame = useCallback((target: number) => {
+    setAutoTarget(wrapFrame(target));
+  }, []);
+
+  // Gira un frame por tick hacia autoTarget, por el camino más corto (nunca
+  // más de FRAME_COUNT/2 pasos). Se detiene solo al llegar o al cancelarse
+  // (autoTarget vuelve a null) — cualquier gesto manual lo cancela más abajo.
+  useEffect(() => {
+    if (autoTarget == null || rotationLocked) return;
+    const id = setInterval(() => {
+      setFrame((f) => {
+        if (f === autoTarget) {
+          clearInterval(id);
+          setAutoTarget(null);
+          return f;
+        }
+        const forwardDist = wrapFrame(autoTarget - f + 1) - 1;
+        const step = forwardDist <= FRAME_COUNT - forwardDist ? 1 : -1;
+        return wrapFrame(f + step);
+      });
+    }, AUTO_ROTATE_STEP_MS);
+    return () => clearInterval(id);
+  }, [autoTarget, rotationLocked]);
 
   const zoomIn = useCallback(() => applyScale(scale + ZOOM_STEP), [applyScale, scale]);
   const zoomOut = useCallback(() => applyScale(scale - ZOOM_STEP), [applyScale, scale]);
@@ -112,6 +144,7 @@ export function useVehicleViewer(initialFrame = 1, rotationLocked = false): UseV
         dragStart.current = null;
         setIsDragging(false);
       } else if (pointers.current.size === 1) {
+        setAutoTarget(null);
         dragStart.current = { x: e.clientX, y: e.clientY, frame, offset };
         setIsDragging(true);
       }
@@ -179,10 +212,16 @@ export function useVehicleViewer(initialFrame = 1, rotationLocked = false): UseV
     (e: React.KeyboardEvent) => {
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        if (!rotationLocked) setFrame((f) => wrapFrame(f + 1));
+        if (!rotationLocked) {
+          setAutoTarget(null);
+          setFrame((f) => wrapFrame(f + 1));
+        }
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
-        if (!rotationLocked) setFrame((f) => wrapFrame(f - 1));
+        if (!rotationLocked) {
+          setAutoTarget(null);
+          setFrame((f) => wrapFrame(f - 1));
+        }
       } else if (e.key === "+" || e.key === "=") {
         e.preventDefault();
         zoomIn();
@@ -205,6 +244,7 @@ export function useVehicleViewer(initialFrame = 1, rotationLocked = false): UseV
     isZoomed: scale > MIN_SCALE,
     containerRef,
     rotateBy,
+    goToFrame,
     zoomIn,
     zoomOut,
     resetZoom,

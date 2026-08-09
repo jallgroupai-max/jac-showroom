@@ -21,6 +21,8 @@ import { SpriteViewer } from "./sprite-viewer";
 import { CatalogPanel, EnterVehicleIcon } from "./catalog-panel";
 import { VisualizerControls } from "./visualizer-controls";
 import { PointsOfInterest } from "./points-of-interest";
+import { PoiDetailPanel } from "./poi-detail-panel";
+import { RotateHint } from "./rotate-hint";
 import { SpecsPanel } from "./specs-panel";
 import { LeadForm } from "./lead-form";
 import { LeadConfirmation } from "./lead-confirmation";
@@ -83,9 +85,16 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const [specsOpen, setSpecsOpen] = useState(false);
   const [leadFormOpen, setLeadFormOpen] = useState(false);
   const [leadConfirmationOpen, setLeadConfirmationOpen] = useState(false);
-  // El hint de "arrastra para rotar" parpadea hasta la PRIMERA rotación de la
-  // sesión (cualquier vehículo) — al comenzar a rotar DESAPARECE (fade out).
+  // El hint de "arrastra para rotar" (mano deslizándose) vive hasta la
+  // PRIMERA rotación de la sesión (cualquier vehículo) — al comenzar a rotar
+  // DESAPARECE (fade out) y no vuelve a aparecer salvo refresco de página.
   const [hasRotated, setHasRotated] = useState(false);
+  // Punto de interés abierto — SOLO tiene efecto visual (corrida del auto +
+  // rotación + panel grande) en exterior; ver PointsOfInterest y
+  // PoiDetailPanel. Se cierra solo al cambiar de vehículo/modo/subfase para
+  // no dejar el auto corrido con un panel de un vehículo que ya no es el
+  // activo.
+  const [activePoiId, setActivePoiId] = useState<string | null>(null);
 
   // Sincronización con matchMedia vía useSyncExternalStore (patrón
   // recomendado por React para esto — sin efecto, sin setState-in-effect).
@@ -164,6 +173,20 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
     sceneId === "own" ? undefined : [...SCENES, ...CUSTOM_SCENES].find((s) => s.id === sceneId);
   const backgroundColor = activeScene?.color;
   const backgroundUrl = backgroundColor ? undefined : (activeScene?.imageUrl ?? vehicle.ownBackgroundUrl);
+  // El panel/corrida solo aplica en EXTERIOR (en interior no hay sprite que
+  // rotar ni "lado" del auto donde correrlo — es una panorámica).
+  const activePoi =
+    effectiveViewMode === "exterior" ? vehicle.pointsOfInterest.find((p) => p.id === activePoiId) : undefined;
+
+  // Cierra el punto de interés abierto al cambiar de modo — evita quedar con
+  // el auto corrido y el panel de un modo que ya no es el activo (p. ej. se
+  // pasó a Interior con el panel de exterior abierto). Se llama en el
+  // handler, NO en un efecto, para no disparar un set-state-en-efecto
+  // encadenado (regla del proyecto).
+  function changeViewMode(mode: ViewMode) {
+    setActivePoiId(null);
+    setViewMode(mode);
+  }
 
   // Clic simple en una tarjeta: solo cambia el vehículo (se previsualiza en
   // el héroe detrás) y el selector QUEDA abierto — los controles de color y
@@ -175,7 +198,9 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
     setActiveVehicleSlug(slug);
     setActiveVariantId(next.variants[0].id);
     // El modo Exterior/Interior PERSISTE al cambiar de vehículo (confirmado
-    // en conversación) — no se resetea acá.
+    // en conversación) — no se resetea acá. El punto de interés abierto SÍ
+    // se cierra: quedaba corriendo el auto/panel de un vehículo distinto.
+    setActivePoiId(null);
   }
 
   function confirmVehicle() {
@@ -265,13 +290,14 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             vehicleKey={vehicle.slug}
             spriteSets={spriteSets}
             panoramaUrl={interiorImageUrl}
-            onClosePanorama={() => setViewMode("exterior")}
+            onClosePanorama={() => changeViewMode("exterior")}
             backgroundUrl={backgroundUrl}
             backgroundColor={backgroundColor}
             isFullscreen={isFullscreen}
             onToggleFullscreen={toggleFullscreen}
             showControls={subPhase === "visualizer"}
             onFirstRotate={() => setHasRotated(true)}
+            targetFrame={activePoi?.frame}
           />
 
           {/* Botón de INGRESO flotando encima del carro — visible solo con
@@ -297,6 +323,60 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
           )}
         </motion.div>
 
+        {/* Hint de "arrastra para rotar": mano deslizándose sobre la barra,
+            centrada sobre el vehículo. Visible en TODOS los tamaños (el
+            drag para rotar funciona igual en touch) mientras el vehículo
+            esté a la vista (exterior, visualizador abierto) y hasta la
+            primera rotación de la sesión — ver hasRotated arriba. */}
+        <AnimatePresence>
+          {!hasRotated && subPhase === "visualizer" && effectiveViewMode === "exterior" && (
+            <motion.div
+              key="rotate-hint"
+              initial={false}
+              animate={{ opacity: [0.85, 1, 0.85] }}
+              exit={{ opacity: 0, transition: { duration: 0.3, ease: "easeOut", repeat: 0 } }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+              className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center"
+            >
+              <RotateHint />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Fondo de clic-afuera: al abrir un punto de interés, cualquier clic
+            sobre el héroe (fondo o vehículo) cierra el panel — pedido
+            explícito. Vive DEBAJO de PoiDetailPanel (z-20 contra z-30 del
+            panel) así que un clic DENTRO de la card nunca llega acá. La
+            toolbar de puntos de interés está fuera del héroe (en el bloque
+            de controles de abajo) — nunca queda tapada por esto. */}
+        <AnimatePresence>
+          {activePoi && (
+            <motion.button
+              type="button"
+              aria-label="Cerrar punto de interés"
+              key="poi-backdrop"
+              onClick={() => setActivePoiId(null)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 z-20 cursor-default bg-transparent"
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Panel del punto de interés abierto — PoiDetailPanel resuelve los
+            dos layouts vía CSS responsive: en mobile/tablet es una hoja fija
+            topeada al 45% de la pantalla (pedido explícito) y estirada hasta
+            el borde inferior; en desktop es la card de dos columnas flotando
+            SOBRE el fondo del héroe (el vehículo NO se mueve), pegada abajo
+            a la izquierda, cerca de la toolbar de puntos de interés. */}
+        <AnimatePresence>
+          {activePoi && (
+            <PoiDetailPanel key={activePoi.id} poi={activePoi} onClose={() => setActivePoiId(null)} />
+          )}
+        </AnimatePresence>
+
         {subPhase === "visualizer" && (
           <button
             type="button"
@@ -307,9 +387,6 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
           </button>
         )}
       </div>
-
-      {/* El hint de "arrastra para rotar" NO existe en mobile/tablet (pedido
-          explícito) — solo en desktop, agrupado con el toolbar de POI. */}
 
       {/* Controles: fila normal debajo del héroe en mobile/tablet; overlay
           absoluto flotando sobre el héroe desde desktop (lg:). En "pantalla
@@ -354,33 +431,19 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               transition={{ duration: 0.45, ease: "easeInOut" }}
               className="flex flex-col gap-3"
             >
-              <div className="relative hidden items-center gap-3 lg:flex">
-                <PointsOfInterest points={vehicle.pointsOfInterest} mode={effectiveViewMode} />
-                {/* Centrado absoluto respecto al ancho completo de la fila —
-                    los POI de la izquierda no lo desplazan del centro.
-                    PARPADEA (opacity 0.2 <-> 1, mismo ritmo que el Loading)
-                    y con la primera rotación desaparece con un fade — el
-                    transition del exit pisa el repeat Infinity del parpadeo,
-                    si no el fade de salida no terminaría nunca. */}
-                <AnimatePresence>
-                  {!hasRotated && (
-                    <motion.div
-                      initial={false}
-                      animate={{ opacity: [0.2, 1, 0.2] }}
-                      exit={{ opacity: 0, transition: { duration: 0.3, ease: "easeOut", repeat: 0 } }}
-                      transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-                      className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-xs font-medium text-[#12141A] shadow-sm"
-                    >
-                      Haz clic y arrastra para rotar{" "}
-                      <span className="ml-1 rounded-full bg-[#F4F6F9] px-2 py-0.5 text-[#111318]">360°</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+              <div className="relative flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+                <PointsOfInterest
+                  points={vehicle.pointsOfInterest}
+                  mode={effectiveViewMode}
+                  activeId={activePoiId}
+                  onActiveChange={setActivePoiId}
+                  hideInlineDetail={effectiveViewMode === "exterior"}
+                />
               </div>
               <VisualizerControls
                 vehicle={vehicle}
                 viewMode={effectiveViewMode}
-                onViewModeChange={setViewMode}
+                onViewModeChange={changeViewMode}
                 activeVariantId={activeVariantId}
                 onVariantChange={setActiveVariantId}
                 scenes={SCENES}
@@ -391,7 +454,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
                 // Exterior: si quedaba activo el 360 interior, el panorama
                 // seguía montado tapando la previsualización del catálogo.
                 onChangeVehicle={() => {
-                  setViewMode("exterior");
+                  changeViewMode("exterior");
                   setSubPhase("catalog");
                 }}
               />

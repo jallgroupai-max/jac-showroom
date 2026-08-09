@@ -62,6 +62,15 @@ export interface PointOfInterest {
   title: string;
   description: string;
   order: number;
+  /** Frame del set 360° (1..36) al que rota el vehículo al abrir este punto
+   * de interés — solo aplica en exterior (en interior no hay sprite que
+   * rotar). Ángulos aproximados/placeholder: no hay todavía una convención
+   * documentada de qué frame corresponde a qué ángulo real. */
+  frame?: number;
+  /** Nombre de imagen grande (sin extensión) en /assets/poi para el panel de
+   * detalle que aparece junto al vehículo. Sin esto, el panel muestra solo
+   * título y descripción. */
+  image?: string;
 }
 
 export interface Scene {

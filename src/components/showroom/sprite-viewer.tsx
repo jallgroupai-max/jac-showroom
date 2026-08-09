@@ -48,6 +48,10 @@ interface SpriteViewerProps {
   /** Se dispara UNA sola vez, la primera vez que el usuario rota el vehículo
    * (drag, botones de girar o flechas) — usado por el hint de "360°". */
   onFirstRotate?: () => void;
+  /** Frame (1..36) al que girar automáticamente al abrir un punto de interés
+   * (showroom-app.tsx) — muestra el vehículo desde el ángulo relevante.
+   * Cualquier gesto manual de rotación lo cancela. */
+  targetFrame?: number;
 }
 
 const ROTATE_STEP = 3; // frames por clic (~30°) en los botones manuales
@@ -76,6 +80,7 @@ export function SpriteViewer({
   onToggleFullscreen,
   showControls = true,
   onFirstRotate,
+  targetFrame,
 }: SpriteViewerProps) {
   // Barrido de cambio de color en TRES fases: "preload" (esperar el frame
   // visible del set nuevo — nunca barrer hacia una imagen a medio bajar),
@@ -95,12 +100,17 @@ export function SpriteViewer({
     isZoomed,
     containerRef,
     rotateBy,
+    goToFrame,
     zoomIn,
     zoomOut,
     pointerHandlers,
     keyboardHandlers,
   } = useVehicleViewer(1, wipe !== null);
   const { bestQuality } = useSpriteQuality(cacheKey, spriteSets);
+
+  useEffect(() => {
+    if (targetFrame != null) goToFrame(targetFrame);
+  }, [targetFrame, goToFrame]);
 
   // Vehículo sin modelo 360° ({modelo}/{color}/{quality} inexistente):
   // sin sets no hay nada que rotar — silueta compartida + aviso.

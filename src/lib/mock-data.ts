@@ -80,7 +80,7 @@ export const SCENES: Scene[] = [
  * selección; volver a Claro (el default) restaura el comportamiento normal. */
 export const CUSTOM_SCENES: Scene[] = [
   { id: "medanos-de-coro", label: "Médanos de Coro", imageUrl: "/assets/backgrounds/medanos-de-coro.webp" },
-  { id: "camino-de-la-felicidad", label: "El camino de la felicidad", imageUrl: "/assets/backgrounds/camino-de-la-felicidad.webp" },
+  { id: "camino-de-la-felicidad", label: "El camino de la felicidad", imageUrl: "/assets/backgrounds/camino-de-la-felicidad.png" },
 ];
 
 const AVENTURA_4X4_SPECS: SpecGroup[] = [
@@ -99,11 +99,15 @@ const AVENTURA_4X4_SPECS: SpecGroup[] = [
   },
 ];
 
+// Frames del set 360° (1..36) elegidos para mostrar cada parte del auto de
+// frente a cámara al abrir su punto de interés — placeholder razonable hasta
+// que exista una convención documentada de a qué ángulo real corresponde
+// cada frame.
 const GENERIC_POI_EXTERIOR: PointOfInterest[] = [
-  { id: "poi-ext-1", mode: "exterior", icon: "engine", title: "Motor", description: "Información general del motor (contenido placeholder).", order: 0 },
-  { id: "poi-ext-2", mode: "exterior", icon: "tire", title: "Llantas", description: "Información general de llantas y suspensión (contenido placeholder).", order: 1 },
-  { id: "poi-ext-3", mode: "exterior", icon: "front-lghts", title: "Luces delanteras", description: "Información general de iluminación (contenido placeholder).", order: 2 },
-  { id: "poi-ext-4", mode: "exterior", icon: "automatic", title: "Transmisión", description: "Información general de transmisión (contenido placeholder).", order: 3 },
+  { id: "poi-ext-1", mode: "exterior", icon: "outside_motors", title: "Motor", description: "Información general del motor (contenido placeholder).", order: 0, frame: 1, image: "outside_motor" },
+  { id: "poi-ext-2", mode: "exterior", icon: "outside_ruedas", title: "Llantas", description: "Información general de llantas y suspensión (contenido placeholder).", order: 1, frame: 9, image: "outside_cauchos" },
+  { id: "poi-ext-3", mode: "exterior", icon: "outside_lights", title: "Luces delanteras", description: "Información general de iluminación (contenido placeholder).", order: 2, frame: 3, image: "outside_luces" },
+  { id: "poi-ext-4", mode: "exterior", icon: "outside_maletero", title: "Maletero", description: "Información general del maletero (contenido placeholder).", order: 3, frame: 19, image: "outside_maletero" },
 ];
 
 const GENERIC_POI_INTERIOR: PointOfInterest[] = [
@@ -331,6 +335,11 @@ export function iconAssetUrl(name: string): string {
   return `/assets/icons/${name}.svg`;
 }
 
+/** URL de la imagen grande de un punto de interés (panel de detalle). */
+export function poiImageAssetUrl(name: string): string {
+  return `/assets/poi/${name}.png`;
+}
+
 /**
  * Assets estáticos que el Loading inicial debe dejar descargados antes de
  * llegar al 100% (además de los sprites del vehículo inicial): la imagen de
@@ -349,7 +358,10 @@ export function getPreloadAssetUrls(): string[] {
     // botones de color deben aparecer siempre, todos y de inmediato.
     for (const variant of v.variants) urls.add(variant.thumbnailUrl);
     for (const icon of v.featureIcons) urls.add(iconAssetUrl(icon));
-    for (const poi of v.pointsOfInterest) urls.add(iconAssetUrl(poi.icon));
+    for (const poi of v.pointsOfInterest) {
+      urls.add(iconAssetUrl(poi.icon));
+      if (poi.image) urls.add(poiImageAssetUrl(poi.image));
+    }
     urls.add(v.ownBackgroundUrl);
     // Panorámica interior: SOLO la variante del dispositivo actual — la de
     // desktop pesa varias veces la mobile y precargar ambas no aporta.
