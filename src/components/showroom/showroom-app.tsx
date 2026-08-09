@@ -148,23 +148,6 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
     // antes del primer paint y que el spacer nunca arranque en 0 con flash.
   }, [phase]);
 
-  useLayoutEffect(() => {
-    const el = poiToolbarRef.current;
-    if (!el) return;
-    const GAP = 20;
-    const update = () => setDesktopPanelBottom(window.innerHeight - el.getBoundingClientRect().top + GAP);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    window.addEventListener("resize", update);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", update);
-    };
-    // `subPhase` a propósito: la toolbar solo existe en el DOM con
-    // subPhase === "visualizer".
-  }, [phase, subPhase]);
-
   // "Pantalla completa" solo tiene botón para activarse en desktop o en
   // mobile/tablet HORIZONTAL (ver sprite-viewer.tsx) — si el usuario rota el
   // celular de vuelta a vertical estando en ese modo, se desactiva sola:
@@ -188,6 +171,31 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   // "interior" (p. ej. cambió de vehículo estando en Interior).
   const interiorAvailable = vehicle.interior.sprites.length > 0 || Boolean(vehicle.interior.imageUrl);
   const effectiveViewMode: ViewMode = interiorAvailable ? viewMode : "exterior";
+
+  useLayoutEffect(() => {
+    const el = poiToolbarRef.current;
+    if (!el) return;
+    const GAP = 20;
+    const update = () => setDesktopPanelBottom(window.innerHeight - el.getBoundingClientRect().top + GAP);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+    // `subPhase` a propósito: la toolbar solo existe en el DOM con
+    // subPhase === "visualizer". `effectiveViewMode` TAMBIÉN a propósito —
+    // bug real: la toolbar (con ella este ref) se desmonta al pasar a
+    // Interior y remonta como un nodo NUEVO al volver a Exterior; sin esta
+    // dependencia el efecto no volvía a correr, `poiToolbarRef.current`
+    // apuntaba al nodo viejo (ya desconectado, el ResizeObserver nunca
+    // volvía a disparar) y `desktopPanelBottom` quedaba congelado en el
+    // último valor — el panel de exterior se abría fuera de pantalla tras
+    // un viaje ida y vuelta a Interior.
+  }, [phase, subPhase, effectiveViewMode]);
+
   const spriteSets = effectiveViewMode === "exterior" ? variant.exteriorSprites : vehicle.interior.sprites;
   // Interior con panorámica única: el viewer monta el visor 360° (Photo
   // Sphere Viewer) en lugar del sprite exterior. Cada dispositivo recibe SU
