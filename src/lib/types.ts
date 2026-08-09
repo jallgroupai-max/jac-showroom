@@ -80,6 +80,17 @@ export interface PointOfInterest {
   panoramaPosition?: { textureX: number; textureY: number };
 }
 
+/** Posición/tamaño en viewport (px) de un ícono de punto de interés en el
+ * momento del clic — usado para anclar PoiDetailPanel justo sobre el marker
+ * en la panorámica de interior (su posición en pantalla cambia al arrastrar,
+ * así que se captura al clickear, no se sigue en vivo). */
+export interface MarkerAnchor {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface Scene {
   id: string;
   label: string;

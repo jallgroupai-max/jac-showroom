@@ -1,7 +1,8 @@
 "use client";
 
+import { useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import type { PointOfInterest } from "@/lib/types";
+import type { MarkerAnchor, PointOfInterest } from "@/lib/types";
 import { poiImageAssetUrl } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -9,55 +10,97 @@ interface PoiDetailPanelProps {
   poi: PointOfInterest;
   onClose: () => void;
   /** Distancia en px desde el borde inferior del viewport hasta el borde
-   * inferior de la card — SOLO desktop. Calculado en showroom-app.tsx como
-   * `window.innerHeight - toolbar.getBoundingClientRect().top + 20`, así
-   * la card queda siempre a exactamente 20px por encima de la toolbar de
-   * puntos de interés (pedido explícito), sin importar cuánto mida esa
-   * toolbar. `undefined` en mobile: ahí la posición la resuelve el CSS de
-   * abajo (hoja fija al 45%). */
+   * inferior de la card — SOLO desktop EXTERIOR. Calculado en
+   * showroom-app.tsx como `window.innerHeight - toolbar.getBoundingClientRect().top + 20`,
+   * así la card queda siempre a exactamente 20px por encima de la toolbar
+   * de puntos de interés, sin importar cuánto mida esa toolbar. */
   desktopBottomOffset?: number;
+  /** Posición/tamaño (viewport) del marker de INTERIOR clickeado — SOLO
+   * desktop. Con esto seteado la card se ancla justo al lado de ese punto
+   * de la panorámica (pedido explícito: "la modal debe abrirse justo sobre
+   * el punto de interés") en vez de una posición fija, con flip automático
+   * al lado izquierdo si no entra a la derecha. Ignorado en mobile — ahí
+   * sigue la hoja fija de siempre (anclar una hoja de ancho completo a un
+   * punto de la imagen no tiene sentido de layout). */
+  anchorRect?: MarkerAnchor;
 }
 
+const DESKTOP_QUERY = "(min-width: 1024px)";
+const ANCHOR_GAP = 16;
+const ANCHOR_MARGIN = 16;
+
 /**
- * Panel de detalle de un punto de interés EXTERIOR — reemplaza al tooltip
- * chico de PointsOfInterest. Mismo componente resuelve dos layouts bien
- * distintos vía clases responsive:
+ * Panel de detalle de un punto de interés — reemplaza al tooltip chico de
+ * PointsOfInterest. Mismo componente resuelve tres casos vía props:
  * - Mobile/tablet (<lg): hoja fija anclada abajo, como el formulario "Me
  *   interesa", pero topeada en `top-[45%]` (pedido explícito) en vez de
  *   subir a pantalla completa. Ocupa el 45% inferior de la pantalla (top +
  *   bottom:0 fijan el alto, `h-full` en la card lo hereda) con scroll
- *   propio si el contenido no entra.
- * - Desktop (≥lg): card flotante SOBRE el fondo del héroe — el vehículo NO
- *   se mueve (pedido explícito) — pegada abajo a la izquierda, a 20px justo
- *   ENCIMA de la toolbar de puntos de interés (`desktopBottomOffset`,
- *   medido en vivo — no un padding adivinado).
+ *   propio si el contenido no entra. Mismo layout en AMBOS modos — anclar
+ *   una hoja de ancho completo a un punto de la imagen no tiene sentido.
+ * - Desktop EXTERIOR (`desktopBottomOffset`): card flotante SOBRE el fondo
+ *   del héroe (el vehículo NO se mueve) — pegada abajo a la izquierda, a
+ *   20px justo ENCIMA de la toolbar de puntos de interés.
+ * - Desktop INTERIOR (`anchorRect`): card anclada al lado del marker
+ *   clickeado en la panorámica — medida en un `useLayoutEffect` (se
+ *   necesita el tamaño real de la card para centrarla y decidir el flip)
+ *   en vez de asumir un ancho/alto fijo.
  */
-export function PoiDetailPanel({ poi, onClose, desktopBottomOffset }: PoiDetailPanelProps) {
+export function PoiDetailPanel({ poi, onClose, desktopBottomOffset, anchorRect }: PoiDetailPanelProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [anchoredPos, setAnchoredPos] = useState<{ left: number; top: number } | null>(null);
+
+  useLayoutEffect(() => {
+    // Envuelta en una función nombrada (no `setAnchoredPos` directo) para
+    // seguir el mismo patrón que headerHeight/heroHeight más arriba en
+    // showroom-app.tsx — mide el DOM real y recién ahí fija el estado.
+    const apply = (pos: { left: number; top: number } | null) => setAnchoredPos(pos);
+    if (!anchorRect || !window.matchMedia(DESKTOP_QUERY).matches) {
+      apply(null);
+      return;
+    }
+    const el = cardRef.current;
+    if (!el) return;
+    const { width: panelW, height: panelH } = el.getBoundingClientRect();
+    const spaceRight = window.innerWidth - (anchorRect.x + anchorRect.width);
+    const openLeft = spaceRight < panelW + ANCHOR_GAP + ANCHOR_MARGIN;
+    const left = openLeft
+      ? Math.max(ANCHOR_MARGIN, anchorRect.x - panelW - ANCHOR_GAP)
+      : Math.min(anchorRect.x + anchorRect.width + ANCHOR_GAP, window.innerWidth - panelW - ANCHOR_MARGIN);
+    const top = Math.min(
+      Math.max(ANCHOR_MARGIN, anchorRect.y + anchorRect.height / 2 - panelH / 2),
+      window.innerHeight - panelH - ANCHOR_MARGIN
+    );
+    apply({ left, top });
+  }, [anchorRect]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 24 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      style={desktopBottomOffset != null ? { bottom: desktopBottomOffset } : undefined}
+      style={anchoredPos ?? (desktopBottomOffset != null ? { bottom: desktopBottomOffset } : undefined)}
       className={cn(
         "pointer-events-auto z-30",
         "fixed inset-x-0 top-[45%] bottom-0",
         // En desktop esta caja se estira todo el ancho del héroe (lg:inset-x-0)
-        // pero es en su mayoría aire transparente — el `bottom` real lo pone
+        // pero es en su mayoría aire transparente — la posición real la pone
         // el inline style de arriba. Si quedara pointer-events-auto en toda
         // esa franja, tapaba clics sobre la toolbar de puntos de interés que
         // vive más abajo en el mismo héroe (bug reportado: no se podía
         // elegir otro botón con el panel abierto). Solo la card interior
         // (más abajo) vuelve a activar los clics. `lg:top-auto` cancela el
         // `top-[45%]` de mobile: acá el alto lo da el propio contenido.
-        // `lg:pb-4` es un colchón mínimo por defecto (interior, sin
-        // `desktopBottomOffset`) para que la card no quede pegada al ras
-        // del borde inferior del héroe, encima de la barra de controles.
-        "lg:pointer-events-none lg:absolute lg:inset-x-0 lg:top-auto lg:bg-transparent lg:pb-4 lg:pl-8"
+        anchoredPos
+          ? "lg:pointer-events-none lg:inset-auto lg:bg-transparent"
+          : "lg:pointer-events-none lg:absolute lg:inset-x-0 lg:top-auto lg:bg-transparent lg:pb-4 lg:pl-8"
       )}
     >
-      <div className="relative flex h-full w-full flex-col overflow-x-hidden overflow-y-auto rounded-t-3xl bg-white text-left shadow-2xl lg:pointer-events-auto lg:h-auto lg:max-w-md lg:flex-row lg:rounded-3xl">
+      <div
+        ref={cardRef}
+        className="relative flex h-full w-full flex-col overflow-x-hidden overflow-y-auto rounded-t-3xl bg-white text-left shadow-2xl lg:pointer-events-auto lg:h-auto lg:max-w-md lg:flex-row lg:rounded-3xl"
+      >
         <button
           type="button"
           aria-label="Cerrar"

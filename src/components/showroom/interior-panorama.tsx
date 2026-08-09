@@ -5,7 +5,7 @@ import { EquirectangularAdapter, Viewer } from "@photo-sphere-viewer/core";
 import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import "@photo-sphere-viewer/core/index.css";
 import "@photo-sphere-viewer/markers-plugin/index.css";
-import type { PointOfInterest } from "@/lib/types";
+import type { MarkerAnchor, PointOfInterest } from "@/lib/types";
 import { iconAssetUrl } from "@/lib/mock-data";
 
 interface InteriorPanoramaProps {
@@ -18,7 +18,18 @@ interface InteriorPanoramaProps {
    * Los que no tengan `panoramaPosition` se ignoran acá. */
   points: PointOfInterest[];
   activeId: string | null;
-  onSelectPoint: (id: string) => void;
+  /** `anchor` = posición/tamaño real en viewport del marker clickeado (ver
+   * MarkerAnchor) — showroom-app.tsx la usa para abrir PoiDetailPanel justo
+   * sobre ese punto de la panorámica en vez de en una posición fija. */
+  onSelectPoint: (id: string, anchor: MarkerAnchor) => void;
+}
+
+/** HTML de cada marker: envoltorio + anillo de "gota de agua" (animación
+ * CSS pura, ver globals.css) + ícono — PSV mueve este bloque completo en
+ * cada frame, así que el anillo queda pegado a la posición real de la
+ * esfera 360 sin código de sincronización propio. */
+function markerHtml(iconUrl: string): string {
+  return `<div class="poi-marker-wrap"><span class="poi-marker-ripple" aria-hidden="true"></span><img src="${iconUrl}" class="poi-marker-icon" alt="" /></div>`;
 }
 
 const MARKER_ACTIVE_CLASS = "poi-marker--active";
@@ -67,7 +78,7 @@ export function InteriorPanorama({ imageUrl, points, activeId, onSelectPoint }: 
             markers: markedPoints.map((poi) => ({
               id: poi.id,
               position: { textureX: poi.panoramaPosition!.textureX, textureY: poi.panoramaPosition!.textureY },
-              image: iconAssetUrl(poi.icon),
+              html: markerHtml(iconAssetUrl(poi.icon)),
               size: { width: 44, height: 44 },
               anchor: "center center",
               tooltip: poi.title,
@@ -79,7 +90,10 @@ export function InteriorPanorama({ imageUrl, points, activeId, onSelectPoint }: 
     });
     const markersPlugin = viewer.getPlugin<MarkersPlugin>(MarkersPlugin);
     markersPluginRef.current = markersPlugin ?? null;
-    markersPlugin?.addEventListener("select-marker", ({ marker }) => onSelectPointRef.current(marker.id));
+    markersPlugin?.addEventListener("select-marker", ({ marker }) => {
+      const rect = marker.domElement.getBoundingClientRect();
+      onSelectPointRef.current(marker.id, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+    });
     return () => {
       markersPluginRef.current = null;
       viewer.destroy();

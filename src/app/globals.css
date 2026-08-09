@@ -138,3 +138,43 @@
   border-radius: 9999px;
   box-shadow: 0 0 0 2px #111318;
 }
+
+/* Efecto "gota de agua" de los markers de interior (PSV mueve este HTML
+   junto con el marker en cada frame — así el anillo queda pegado al punto
+   real de la esfera 360 al arrastrar/mirar alrededor, sin código de
+   sincronización propio). Mismo criterio de loop sin parpadeo que la
+   toolbar exterior: opacidad arranca y termina en 0. Blanco, igual que el
+   ajuste de la toolbar exterior en desktop. */
+.poi-marker-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.poi-marker-icon {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.poi-marker-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  opacity: 0;
+  animation: poi-marker-ripple 2.2s ease-out infinite;
+}
+@keyframes poi-marker-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}

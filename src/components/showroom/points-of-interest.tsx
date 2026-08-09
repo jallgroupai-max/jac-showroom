@@ -27,8 +27,11 @@ interface PointsOfInterestProps {
 // 0.7->0) para que el reinicio del loop ocurra con el anillo YA invisible:
 // así no hay parpadeo/salto al recomenzar cada ciclo.
 const RIPPLE_DURATION = 2.2;
-const RIPPLE_MOBILE = { color: "#D1D5DB", peakOpacity: 0.45 };
-const RIPPLE_DESKTOP = { color: "#111318", peakOpacity: 1 };
+const RIPPLE_MOBILE = { color: "#D1D5DB", peakOpacity: 0.45, maxScale: 1.5 };
+// Blanco y más sutil — el negro de antes se veía "muy negro" (pedido
+// explícito de bajarlo); menos crecimiento (1.3 en vez de 1.5) para que se
+// sienta más chico/discreto.
+const RIPPLE_DESKTOP = { color: "#FFFFFF", peakOpacity: 0.55, maxScale: 1.3 };
 
 /**
  * Toolbar de "puntos de interés" — hotspots configurables por vehículo y
@@ -58,7 +61,7 @@ export function PointsOfInterest({ points, mode, activeId, onActiveChange, hideI
               className="absolute inset-0 rounded-full border-2"
               style={{ borderColor: ripple.color }}
               initial={{ scale: 1, opacity: 0 }}
-              animate={{ scale: [1, 1.5], opacity: [0, ripple.peakOpacity, 0] }}
+              animate={{ scale: [1, ripple.maxScale], opacity: [0, ripple.peakOpacity, 0] }}
               transition={{ duration: RIPPLE_DURATION, repeat: Infinity, ease: "easeOut" }}
             />
           </div>

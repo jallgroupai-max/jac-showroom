@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { Scene, ViewMode } from "@/lib/types";
+import type { MarkerAnchor, Scene, ViewMode } from "@/lib/types";
 import {
   CATEGORIES,
   CUSTOM_SCENES,
@@ -95,6 +95,13 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   // no dejar el auto corrido con un panel de un vehículo que ya no es el
   // activo.
   const [activePoiId, setActivePoiId] = useState<string | null>(null);
+  // Posición/tamaño (viewport) del marker de INTERIOR clickeado — captura
+  // única al momento del clic (ver InteriorPanorama), no sigue al marker si
+  // el usuario sigue arrastrando después. Usada para abrir PoiDetailPanel
+  // justo sobre ese punto de la panorámica en vez de en una posición fija
+  // (pedido explícito). `null` en exterior (ver PoiDetailPanel: sin esto,
+  // usa la posición junto a la toolbar).
+  const [interiorPoiAnchor, setInteriorPoiAnchor] = useState<MarkerAnchor | null>(null);
 
   // Sincronización con matchMedia vía useSyncExternalStore (patrón
   // recomendado por React para esto — sin efecto, sin setState-in-effect).
@@ -319,7 +326,10 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             onClosePanorama={() => changeViewMode("exterior")}
             interiorPoints={interiorPoints}
             activePoiId={activePoiId}
-            onSelectPoi={(id) => setActivePoiId((cur) => (cur === id ? null : id))}
+            onSelectPoi={(id, anchor) => {
+              setActivePoiId((cur) => (cur === id ? null : id));
+              setInteriorPoiAnchor(anchor);
+            }}
             backgroundUrl={backgroundUrl}
             backgroundColor={backgroundColor}
             isFullscreen={isFullscreen}
@@ -374,10 +384,17 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
 
         {/* Fondo de clic-afuera: al abrir un punto de interés, cualquier clic
             sobre el héroe (fondo o vehículo) cierra el panel — pedido
-            explícito. Vive DEBAJO de PoiDetailPanel (z-20 contra z-30 del
-            panel) así que un clic DENTRO de la card nunca llega acá. La
-            toolbar de puntos de interés está fuera del héroe (en el bloque
-            de controles de abajo) — nunca queda tapada por esto. */}
+            explícito. Vive DEBAJO de PoiDetailPanel (z-30) así que un clic
+            DENTRO de la card nunca llega acá. BUG REAL que hubo acá: el
+            bloque de controles (toolbar de puntos de interés incluida)
+            flota EN DESKTOP sobre el borde inferior del héroe vía
+            `lg:absolute lg:bottom-0` con z-10 — con este fondo en z-20
+            (por encima de esa toolbar) cualquier clic sobre OTRO botón de
+            punto de interés, con un panel ya abierto, le pegaba a este
+            fondo en vez de al botón real: cerraba el panel actual pero
+            nunca abría el siguiente. z-[5] (por debajo de la toolbar/tab
+            ESPEC/hint, todos z-10) deja pasar esos clics a sus botones
+            reales y solo intercepta clics sobre el fondo/vehículo. */}
         <AnimatePresence>
           {activePoi && (
             <motion.button
@@ -389,24 +406,24 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="absolute inset-0 z-20 cursor-default bg-transparent"
+              className="absolute inset-0 z-[5] cursor-default bg-transparent"
             />
           )}
         </AnimatePresence>
 
-        {/* Panel del punto de interés abierto — PoiDetailPanel resuelve los
-            dos layouts vía CSS responsive: en mobile/tablet es una hoja fija
-            topeada al 45% de la pantalla (pedido explícito) y estirada hasta
-            el borde inferior; en desktop es la card de dos columnas flotando
-            SOBRE el fondo del héroe (el vehículo NO se mueve). En exterior
-            queda pegada justo arriba de la toolbar de puntos de interés —
-            20px de separación (desktopPanelBottom, medido en vivo). En
-            interior esa toolbar no existe (los puntos de interés viven como
-            markers sobre la panorámica) — `desktopPanelBottom` se mide
-            SOLO mientras la toolbar está montada, así que pasarlo también
-            en interior dejaba un valor viejo (de cuando sí existía) que
-            empujaba el panel fuera de la pantalla — bug real, visto en
-            producción: el panel "no aparecía" al abrir un punto interior. */}
+        {/* Panel del punto de interés abierto — PoiDetailPanel resuelve tres
+            casos vía props:
+            - Mobile/tablet (<lg): hoja fija topeada al 45% de la pantalla
+              (pedido explícito), sin importar el modo.
+            - Desktop EXTERIOR: card flotando junto al vehículo, pegada
+              justo arriba de la toolbar de puntos de interés — 20px de
+              separación (desktopPanelBottom, medido en vivo).
+            - Desktop INTERIOR: card anclada justo sobre el marker
+              clickeado en la panorámica (anchorRect, capturado al clic en
+              InteriorPanorama) — pedido explícito. Se gatea por
+              effectiveViewMode (no solo por si `interiorPoiAnchor` es
+              null) por la misma razón que `desktopBottomOffset`: sin eso,
+              un valor viejo de un modo se cuela en el otro. */}
         <AnimatePresence>
           {activePoi && (
             <PoiDetailPanel
@@ -414,6 +431,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               poi={activePoi}
               onClose={() => setActivePoiId(null)}
               desktopBottomOffset={isDesktop && effectiveViewMode === "exterior" ? desktopPanelBottom : undefined}
+              anchorRect={effectiveViewMode === "interior" ? (interiorPoiAnchor ?? undefined) : undefined}
             />
           )}
         </AnimatePresence>

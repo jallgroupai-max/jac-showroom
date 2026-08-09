@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Maximize, Minimize, Minus, Plus, RotateCcw, RotateCw, X } from "lucide-react";
-import type { PointOfInterest, SpriteSet } from "@/lib/types";
+import type { MarkerAnchor, PointOfInterest, SpriteSet } from "@/lib/types";
 import { UNAVAILABLE_VEHICLE_IMAGE } from "@/lib/mock-data";
 import { FRAME_COUNT, warmDecodedFrames } from "@/lib/sprite-cache";
 import { MAX_SCALE, useVehicleViewer } from "@/hooks/use-vehicle-viewer";
@@ -31,7 +31,7 @@ interface SpriteViewerProps {
    * cuando no hay `panoramaUrl`. */
   interiorPoints?: PointOfInterest[];
   activePoiId?: string | null;
-  onSelectPoi?: (id: string) => void;
+  onSelectPoi?: (id: string, anchor: MarkerAnchor) => void;
   /** Alternativa a `backgroundColor` — foto de escena. */
   backgroundUrl?: string;
   /** Alternativa a `backgroundUrl` — fondo de color sólido. */
