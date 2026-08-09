@@ -14,6 +14,12 @@ interface PointsOfInterestProps {
    * vehículo (showroom-app.tsx), así que este componente NO dibuja su propio
    * tooltip flotante — solo los botones + el efecto de gota de agua. */
   hideInlineDetail?: boolean;
+  /** Intensidad del anillo por dispositivo (pedido explícito, dos rondas
+   * distintas): en mobile se veía DEMASIADO marcado — gris claro y
+   * opacidad baja; en desktop casi no se notaba — gris oscuro y opacidad
+   * alta. No hay forma de variar esto solo con clases responsive porque
+   * `animate` de framer-motion es JS, no CSS. */
+  isDesktop: boolean;
 }
 
 // Un solo anillo, sutil — reducido a pedido (dos anillos se sentía muy
@@ -21,6 +27,8 @@ interface PointsOfInterestProps {
 // 0.7->0) para que el reinicio del loop ocurra con el anillo YA invisible:
 // así no hay parpadeo/salto al recomenzar cada ciclo.
 const RIPPLE_DURATION = 2.2;
+const RIPPLE_MOBILE = { color: "#D1D5DB", peakOpacity: 0.45 };
+const RIPPLE_DESKTOP = { color: "#111318", peakOpacity: 1 };
 
 /**
  * Toolbar de "puntos de interés" — hotspots configurables por vehículo y
@@ -31,24 +39,26 @@ const RIPPLE_DURATION = 2.2;
  * desde ShowroomApp: en exterior, abrir un punto de interés también rota el
  * vehículo y corre el panel grande de detalle (ver PoiDetailPanel).
  */
-export function PointsOfInterest({ points, mode, activeId, onActiveChange, hideInlineDetail }: PointsOfInterestProps) {
+export function PointsOfInterest({ points, mode, activeId, onActiveChange, hideInlineDetail, isDesktop }: PointsOfInterestProps) {
   const filtered = points.filter((p) => p.mode === mode).sort((a, b) => a.order - b.order);
   const active = filtered.find((p) => p.id === activeId);
+  const ripple = isDesktop ? RIPPLE_DESKTOP : RIPPLE_MOBILE;
 
   return (
     <div className="flex flex-row gap-3">
       {filtered.map((poi) => (
         <div key={poi.id} className="relative">
           {/* Efecto "gota de agua": un anillo que nace del tamaño del botón y
-              se aleja agrandándose mientras se desvanece, en loop. Gris
-              (negro puro se sentía muy duro) y con opacidad de pico casi
-              total para que se distinga bien. Van detrás del botón (antes
-              en el DOM, sin z-index) para no tapar el ícono. */}
+              se aleja agrandándose mientras se desvanece, en loop. Color y
+              opacidad de pico DISTINTOS por dispositivo — ver RIPPLE_MOBILE
+              / RIPPLE_DESKTOP arriba. Van detrás del botón (antes en el DOM,
+              sin z-index) para no tapar el ícono. */}
           <div className="pointer-events-none absolute inset-0 rounded-full" aria-hidden>
             <motion.span
-              className="absolute inset-0 rounded-full border-2 border-[#6B7280]"
+              className="absolute inset-0 rounded-full border-2"
+              style={{ borderColor: ripple.color }}
               initial={{ scale: 1, opacity: 0 }}
-              animate={{ scale: [1, 1.5], opacity: [0, 0.95, 0] }}
+              animate={{ scale: [1, 1.5], opacity: [0, ripple.peakOpacity, 0] }}
               transition={{ duration: RIPPLE_DURATION, repeat: Infinity, ease: "easeOut" }}
             />
           </div>

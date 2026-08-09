@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Maximize, Minimize, Minus, Plus, RotateCcw, RotateCw, X } from "lucide-react";
-import type { SpriteSet } from "@/lib/types";
+import type { PointOfInterest, SpriteSet } from "@/lib/types";
 import { UNAVAILABLE_VEHICLE_IMAGE } from "@/lib/mock-data";
 import { FRAME_COUNT, warmDecodedFrames } from "@/lib/sprite-cache";
 import { MAX_SCALE, useVehicleViewer } from "@/hooks/use-vehicle-viewer";
@@ -26,6 +26,12 @@ interface SpriteViewerProps {
   panoramaUrl?: string;
   /** Cierra la vista interior (botón "Cerrar" flotante, solo desktop). */
   onClosePanorama?: () => void;
+  /** Puntos de interés de INTERIOR (con `panoramaPosition`) a dibujar como
+   * íconos flotantes sobre la panorámica — ver InteriorPanorama. Ignorados
+   * cuando no hay `panoramaUrl`. */
+  interiorPoints?: PointOfInterest[];
+  activePoiId?: string | null;
+  onSelectPoi?: (id: string) => void;
   /** Alternativa a `backgroundColor` — foto de escena. */
   backgroundUrl?: string;
   /** Alternativa a `backgroundUrl` — fondo de color sólido. */
@@ -73,6 +79,9 @@ export function SpriteViewer({
   spriteSets,
   panoramaUrl,
   onClosePanorama,
+  interiorPoints,
+  activePoiId,
+  onSelectPoi,
   backgroundUrl,
   backgroundColor,
   className,
@@ -193,7 +202,12 @@ export function SpriteViewer({
             superponen); en DESKTOP se recorta un 25% desde abajo para no
             quedar debajo de los controles flotantes (lg:absolute). */}
         <div className="absolute inset-x-0 top-0 bottom-0 overflow-hidden lg:bottom-[25%]">
-          <InteriorPanorama imageUrl={panoramaUrl} />
+          <InteriorPanorama
+            imageUrl={panoramaUrl}
+            points={interiorPoints ?? []}
+            activeId={activePoiId ?? null}
+            onSelectPoint={onSelectPoi ?? (() => {})}
+          />
         </div>
 
         {/* "Cerrar" flotante — pastilla negra como el resto de los CTA, con

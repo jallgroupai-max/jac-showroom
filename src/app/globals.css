@@ -129,3 +129,12 @@
     @apply font-sans;
   }
 }
+
+/* Punto de interés activo sobre la panorámica 360 del interior (Photo
+   Sphere Viewer no acepta clases Tailwind arbitrarias en sus markers) —
+   mismo criterio visual que el anillo de la toolbar exterior
+   (points-of-interest.tsx). Ver interior-panorama.tsx. */
+.poi-marker--active {
+  border-radius: 9999px;
+  box-shadow: 0 0 0 2px #111318;
+}

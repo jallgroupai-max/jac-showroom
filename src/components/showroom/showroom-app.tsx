@@ -115,6 +115,13 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreen();
   const headerRef = useRef<HTMLElement>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
+  // Toolbar de puntos de interés — SOLO en desktop, para anclar el panel de
+  // detalle justo arriba de ella con 20px de separación (pedido explícito).
+  // Se mide con getBoundingClientRect().top y se convierte a un `bottom` en
+  // px (distancia real al borde inferior del viewport + el gap deseado) —
+  // más preciso que adivinar un padding fijo.
+  const poiToolbarRef = useRef<HTMLDivElement>(null);
+  const [desktopPanelBottom, setDesktopPanelBottom] = useState(0);
   // Posición del pointerdown sobre el héroe — distingue clic de arrastre
   // para el cierre del selector de vehículos.
   const heroPressRef = useRef<{ x: number; y: number } | null>(null);
@@ -133,6 +140,23 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
     // apunta al nodo real. `useLayoutEffect` (no `useEffect`) para medir
     // antes del primer paint y que el spacer nunca arranque en 0 con flash.
   }, [phase]);
+
+  useLayoutEffect(() => {
+    const el = poiToolbarRef.current;
+    if (!el) return;
+    const GAP = 20;
+    const update = () => setDesktopPanelBottom(window.innerHeight - el.getBoundingClientRect().top + GAP);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+    // `subPhase` a propósito: la toolbar solo existe en el DOM con
+    // subPhase === "visualizer".
+  }, [phase, subPhase]);
 
   // "Pantalla completa" solo tiene botón para activarse en desktop o en
   // mobile/tablet HORIZONTAL (ver sprite-viewer.tsx) — si el usuario rota el
@@ -173,10 +197,12 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
     sceneId === "own" ? undefined : [...SCENES, ...CUSTOM_SCENES].find((s) => s.id === sceneId);
   const backgroundColor = activeScene?.color;
   const backgroundUrl = backgroundColor ? undefined : (activeScene?.imageUrl ?? vehicle.ownBackgroundUrl);
-  // El panel/corrida solo aplica en EXTERIOR (en interior no hay sprite que
-  // rotar ni "lado" del auto donde correrlo — es una panorámica).
-  const activePoi =
-    effectiveViewMode === "exterior" ? vehicle.pointsOfInterest.find((p) => p.id === activePoiId) : undefined;
+  // El panel de detalle aplica en AMBOS modos — en exterior además corre el
+  // auto (targetFrame más abajo); en interior el punto de interés vive como
+  // ícono flotante sobre la panorámica (ver interiorPoints/InteriorPanorama),
+  // sin equivalente de "correr el auto".
+  const activePoi = vehicle.pointsOfInterest.find((p) => p.id === activePoiId);
+  const interiorPoints = vehicle.pointsOfInterest.filter((p) => p.mode === "interior");
 
   // Cierra el punto de interés abierto al cambiar de modo — evita quedar con
   // el auto corrido y el panel de un modo que ya no es el activo (p. ej. se
@@ -291,6 +317,9 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             spriteSets={spriteSets}
             panoramaUrl={interiorImageUrl}
             onClosePanorama={() => changeViewMode("exterior")}
+            interiorPoints={interiorPoints}
+            activePoiId={activePoiId}
+            onSelectPoi={(id) => setActivePoiId((cur) => (cur === id ? null : id))}
             backgroundUrl={backgroundUrl}
             backgroundColor={backgroundColor}
             isFullscreen={isFullscreen}
@@ -369,11 +398,17 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
             dos layouts vía CSS responsive: en mobile/tablet es una hoja fija
             topeada al 45% de la pantalla (pedido explícito) y estirada hasta
             el borde inferior; en desktop es la card de dos columnas flotando
-            SOBRE el fondo del héroe (el vehículo NO se mueve), pegada abajo
-            a la izquierda, cerca de la toolbar de puntos de interés. */}
+            SOBRE el fondo del héroe (el vehículo NO se mueve), pegada
+            justo arriba de la toolbar de puntos de interés — 20px de
+            separación (desktopPanelBottom, medido en vivo). */}
         <AnimatePresence>
           {activePoi && (
-            <PoiDetailPanel key={activePoi.id} poi={activePoi} onClose={() => setActivePoiId(null)} />
+            <PoiDetailPanel
+              key={activePoi.id}
+              poi={activePoi}
+              onClose={() => setActivePoiId(null)}
+              desktopBottomOffset={isDesktop ? desktopPanelBottom : undefined}
+            />
           )}
         </AnimatePresence>
 
@@ -431,15 +466,22 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               transition={{ duration: 0.45, ease: "easeInOut" }}
               className="flex flex-col gap-3"
             >
-              <div className="relative flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-                <PointsOfInterest
-                  points={vehicle.pointsOfInterest}
-                  mode={effectiveViewMode}
-                  activeId={activePoiId}
-                  onActiveChange={setActivePoiId}
-                  hideInlineDetail={effectiveViewMode === "exterior"}
-                />
-              </div>
+              {/* Solo EXTERIOR usa la toolbar de botones — en interior cada
+                  punto de interés vive como ícono flotante sobre la propia
+                  panorámica (ver interiorPoints/InteriorPanorama), así que
+                  no hace falta (ni tendría sentido) repetirlos acá abajo. */}
+              {effectiveViewMode === "exterior" && (
+                <div ref={poiToolbarRef} className="relative flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+                  <PointsOfInterest
+                    points={vehicle.pointsOfInterest}
+                    mode={effectiveViewMode}
+                    activeId={activePoiId}
+                    onActiveChange={setActivePoiId}
+                    hideInlineDetail
+                    isDesktop={isDesktop}
+                  />
+                </div>
+              )}
               <VisualizerControls
                 vehicle={vehicle}
                 viewMode={effectiveViewMode}

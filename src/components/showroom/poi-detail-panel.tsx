@@ -8,6 +8,14 @@ import { cn } from "@/lib/utils";
 interface PoiDetailPanelProps {
   poi: PointOfInterest;
   onClose: () => void;
+  /** Distancia en px desde el borde inferior del viewport hasta el borde
+   * inferior de la card — SOLO desktop. Calculado en showroom-app.tsx como
+   * `window.innerHeight - toolbar.getBoundingClientRect().top + 20`, así
+   * la card queda siempre a exactamente 20px por encima de la toolbar de
+   * puntos de interés (pedido explícito), sin importar cuánto mida esa
+   * toolbar. `undefined` en mobile: ahí la posición la resuelve el CSS de
+   * abajo (hoja fija al 45%). */
+  desktopBottomOffset?: number;
 }
 
 /**
@@ -20,31 +28,30 @@ interface PoiDetailPanelProps {
  *   bottom:0 fijan el alto, `h-full` en la card lo hereda) con scroll
  *   propio si el contenido no entra.
  * - Desktop (≥lg): card flotante SOBRE el fondo del héroe — el vehículo NO
- *   se mueve (pedido explícito) — pegada abajo a la izquierda, justo ENCIMA
- *   de la toolbar de puntos de interés (que flota fuera del héroe, en el
- *   bloque de controles) — pedido explícito: "mucho más cerca de los
- *   botones". `lg:pb-36` es una estimación del alto de ese bloque
- *   (toolbar + fila de controles + su padding inferior) — ajustar ese
- *   número si queda corto/largo una vez visto en pantalla real.
+ *   se mueve (pedido explícito) — pegada abajo a la izquierda, a 20px justo
+ *   ENCIMA de la toolbar de puntos de interés (`desktopBottomOffset`,
+ *   medido en vivo — no un padding adivinado).
  */
-export function PoiDetailPanel({ poi, onClose }: PoiDetailPanelProps) {
+export function PoiDetailPanel({ poi, onClose, desktopBottomOffset }: PoiDetailPanelProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 24 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
+      style={desktopBottomOffset != null ? { bottom: desktopBottomOffset } : undefined}
       className={cn(
         "pointer-events-auto z-30",
         "fixed inset-x-0 top-[45%] bottom-0",
-        // En desktop esta caja cubre TODO el héroe (lg:inset-0) para poder
-        // anclar la card abajo con flex — pero es en su mayoría aire
-        // transparente. Si quedara pointer-events-auto en toda esa caja,
-        // tapaba clics sobre la toolbar de puntos de interés que vive más
-        // abajo en el mismo héroe (bug reportado: no se podía elegir otro
-        // botón con el panel abierto). Solo la card interior (más abajo)
-        // vuelve a activar los clics.
-        "lg:pointer-events-none lg:absolute lg:inset-0 lg:flex lg:items-end lg:justify-start lg:bg-transparent lg:pb-36 lg:pl-8"
+        // En desktop esta caja se estira todo el ancho del héroe (lg:inset-x-0)
+        // pero es en su mayoría aire transparente — el `bottom` real lo pone
+        // el inline style de arriba. Si quedara pointer-events-auto en toda
+        // esa franja, tapaba clics sobre la toolbar de puntos de interés que
+        // vive más abajo en el mismo héroe (bug reportado: no se podía
+        // elegir otro botón con el panel abierto). Solo la card interior
+        // (más abajo) vuelve a activar los clics. `lg:top-auto` cancela el
+        // `top-[45%]` de mobile: acá el alto lo da el propio contenido.
+        "lg:pointer-events-none lg:absolute lg:inset-x-0 lg:top-auto lg:bg-transparent lg:pl-8"
       )}
     >
       <div className="relative flex h-full w-full flex-col overflow-x-hidden overflow-y-auto rounded-t-3xl bg-white text-left shadow-2xl lg:pointer-events-auto lg:h-auto lg:max-w-md lg:flex-row lg:rounded-3xl">

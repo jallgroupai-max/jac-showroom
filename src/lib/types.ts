@@ -71,6 +71,13 @@ export interface PointOfInterest {
    * detalle que aparece junto al vehículo. Sin esto, el panel muestra solo
    * título y descripción. */
   image?: string;
+  /** Posición del ícono flotante SOBRE la panorámica 360 del interior —
+   * coordenadas en píxeles de la textura equirectangular original (no del
+   * viewport). Solo aplica en interior; en exterior el punto de interés se
+   * ubica en la toolbar, no sobre la imagen. Valores aproximados: se
+   * estimaron mirando la panorámica de referencia (elite-desktop.webp) —
+   * ajustar si no coinciden con el elemento real. */
+  panoramaPosition?: { textureX: number; textureY: number };
 }
 
 export interface Scene {

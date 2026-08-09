@@ -110,11 +110,19 @@ const GENERIC_POI_EXTERIOR: PointOfInterest[] = [
   { id: "poi-ext-4", mode: "exterior", icon: "outside_maletero", title: "Maletero", description: "Información general del maletero (contenido placeholder).", order: 3, frame: 19, image: "outside_maletero" },
 ];
 
+// Coordenadas en píxeles de la textura equirectangular original
+// (elite-desktop.webp, 7096x3548) — estimadas a ojo mirando esa panorámica
+// de referencia, no medidas con una herramienta. Son placeholder razonable:
+// si no coinciden con el elemento real al probarlo, son un solo par de
+// números para ajustar por punto (ver PointOfInterest.panoramaPosition).
 const GENERIC_POI_INTERIOR: PointOfInterest[] = [
-  { id: "poi-int-1", mode: "interior", icon: "touch-screen", title: "Pantalla táctil", description: "Información general del sistema multimedia (contenido placeholder).", order: 0 },
-  { id: "poi-int-2", mode: "interior", icon: "smart-steering-wheel", title: "Volante inteligente", description: "Información general de controles (contenido placeholder).", order: 1 },
-  { id: "poi-int-3", mode: "interior", icon: "seat-heater", title: "Asientos", description: "Información general de confort (contenido placeholder).", order: 2 },
-  { id: "poi-int-4", mode: "interior", icon: "connectivity", title: "Conectividad", description: "Información general de conectividad (contenido placeholder).", order: 3 },
+  { id: "poi-int-1", mode: "interior", icon: "inside_volante", title: "Volante", description: "Información general del volante (contenido placeholder).", order: 0, image: "inside_volante", panoramaPosition: { textureX: 3051, textureY: 1916 } },
+  { id: "poi-int-2", mode: "interior", icon: "inside_tablero", title: "Tablero", description: "Información general del tablero (contenido placeholder).", order: 1, image: "inside_tablero", panoramaPosition: { textureX: 3654, textureY: 1774 } },
+  { id: "poi-int-3", mode: "interior", icon: "inside_transmition", title: "Transmisión", description: "Información general de la transmisión (contenido placeholder).", order: 2, image: "inside_transmision", panoramaPosition: { textureX: 3495, textureY: 2484 } },
+  { id: "poi-int-4", mode: "interior", icon: "inside_asientos", title: "Asientos", description: "Información general de los asientos (contenido placeholder).", order: 3, image: "inside_asientos", panoramaPosition: { textureX: 1668, textureY: 2129 } },
+  // Sin ícono propio de "puertas" todavía — additional_info.svg como
+  // placeholder (decisión explícita, hasta que se agregue uno específico).
+  { id: "poi-int-5", mode: "interior", icon: "additional_info", title: "Puertas", description: "Información general de las puertas (contenido placeholder).", order: 4, image: "inside_puerta", panoramaPosition: { textureX: 781, textureY: 1845 } },
 ];
 
 function makeVehicle(partial: {
