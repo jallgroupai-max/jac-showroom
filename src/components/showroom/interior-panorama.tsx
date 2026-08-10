@@ -28,8 +28,10 @@ interface InteriorPanoramaProps {
  * CSS pura, ver globals.css) + ícono — PSV mueve este bloque completo en
  * cada frame, así que el anillo queda pegado a la posición real de la
  * esfera 360 sin código de sincronización propio. */
-function markerHtml(iconUrl: string): string {
-  return `<div class="poi-marker-wrap"><span class="poi-marker-ripple" aria-hidden="true"></span><img src="${iconUrl}" class="poi-marker-icon" alt="" /></div>`;
+function markerHtml(iconUrl: string, blink: "soft" | "fast" | "none" = "soft"): string {
+  const rippleClass =
+    blink === "soft" ? "poi-marker-ripple" : `poi-marker-ripple poi-marker-ripple--${blink}`;
+  return `<div class="poi-marker-wrap"><span class="${rippleClass}" aria-hidden="true"></span><img src="${iconUrl}" class="poi-marker-icon" alt="" /></div>`;
 }
 
 const MARKER_ACTIVE_CLASS = "poi-marker--active";
@@ -57,46 +59,69 @@ export function InteriorPanorama({ imageUrl, points, activeId, onSelectPoint }: 
     const container = containerRef.current;
     if (!container) return;
     const markedPoints = points.filter((p) => p.panoramaPosition);
-    const viewer = new Viewer({
-      container,
-      panorama: imageUrl,
-      // Sin barra de controles: el zoom queda fijo en 75% (rueda/pellizco
-      // siguen funcionando, pero sin botones en pantalla).
-      navbar: false,
-      defaultZoomLvl: 75,
-      // Un dedo alcanza para mirar alrededor (igual que en Changan).
-      touchmoveTwoFingers: false,
-      // La panorámica se lee SIEMPRE por su relación 2:1 (esfera completa),
-      // ignorando cualquier metadato XMP de recorte que traiga el archivo —
-      // con metadatos parciales la esfera no cerraba y quedaba una franja
-      // negra entre los extremos.
-      adapter: [EquirectangularAdapter, { useXmpData: false }],
-      plugins: [
-        [
-          MarkersPlugin,
-          {
-            markers: markedPoints.map((poi) => ({
-              id: poi.id,
-              position: { textureX: poi.panoramaPosition!.textureX, textureY: poi.panoramaPosition!.textureY },
-              html: markerHtml(iconAssetUrl(poi.icon)),
-              size: { width: 44, height: 44 },
-              anchor: "center center",
-              tooltip: poi.title,
-              className: poi.id === activeId ? MARKER_ACTIVE_CLASS : undefined,
-            })),
-          },
+    let viewer: Viewer | null = null;
+    let disposed = false;
+    // La creación se difiere un frame: en dev, StrictMode monta→desmonta→
+    // monta el componente y el viewer del montaje fantasma disparaba una
+    // descarga de la panorámica que su destroy() abortaba (img.src="");
+    // Chrome comparte la petición entre imágenes idénticas en vuelo, así
+    // que el abort también mataba la carga del viewer definitivo y el visor
+    // quedaba clavado en "Loading…". Con el RAF, el montaje fantasma se
+    // cancela antes de crear viewer alguno.
+    const raf = requestAnimationFrame(() => {
+      if (disposed) return;
+      viewer = new Viewer({
+        container,
+        panorama: imageUrl,
+        // Sin barra de controles: el zoom queda fijo en 75% (rueda/pellizco
+        // siguen funcionando, pero sin botones en pantalla).
+        navbar: false,
+        defaultZoomLvl: 75,
+        // Un dedo alcanza para mirar alrededor (igual que en Changan).
+        touchmoveTwoFingers: false,
+        // La panorámica se lee SIEMPRE por su relación 2:1 (esfera completa),
+        // ignorando cualquier metadato XMP de recorte que traiga el archivo —
+        // con metadatos parciales la esfera no cerraba y quedaba una franja
+        // negra entre los extremos.
+        adapter: [EquirectangularAdapter, { useXmpData: false }],
+        plugins: [
+          [
+            MarkersPlugin,
+            {
+              markers: markedPoints.map((poi) => ({
+                id: poi.id,
+                position: { textureX: poi.panoramaPosition!.textureX, textureY: poi.panoramaPosition!.textureY },
+                html: markerHtml(iconAssetUrl(poi.icon), poi.blink ?? "soft"),
+                size: { width: 44, height: 44 },
+                anchor: "center center",
+                tooltip: poi.title,
+                className: poi.id === activeId ? MARKER_ACTIVE_CLASS : undefined,
+              })),
+            },
+          ],
         ],
-      ],
-    });
-    const markersPlugin = viewer.getPlugin<MarkersPlugin>(MarkersPlugin);
-    markersPluginRef.current = markersPlugin ?? null;
-    markersPlugin?.addEventListener("select-marker", ({ marker }) => {
-      const rect = marker.domElement.getBoundingClientRect();
-      onSelectPointRef.current(marker.id, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      });
+      // Red de seguridad: si la carga aún así falla (red, abort externo),
+      // se reintenta una vez en lugar de dejar el spinner infinito.
+      let retried = false;
+      viewer.addEventListener("panorama-error", () => {
+        if (!retried && !disposed && viewer) {
+          retried = true;
+          viewer.setPanorama(imageUrl);
+        }
+      });
+      const markersPlugin = viewer.getPlugin<MarkersPlugin>(MarkersPlugin);
+      markersPluginRef.current = markersPlugin ?? null;
+      markersPlugin?.addEventListener("select-marker", ({ marker }) => {
+        const rect = marker.domElement.getBoundingClientRect();
+        onSelectPointRef.current(marker.id, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      });
     });
     return () => {
+      disposed = true;
+      cancelAnimationFrame(raf);
       markersPluginRef.current = null;
-      viewer.destroy();
+      viewer?.destroy();
     };
     // `points` deliberadamente NO está en las deps: son estáticos por
     // vehículo (misma lista de mock-data.ts) — lo que sí cambia es

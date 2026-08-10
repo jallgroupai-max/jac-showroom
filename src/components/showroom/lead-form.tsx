@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ContactChannel, LeadPayload, Vehicle, VehicleVariant } from "@/lib/types";
-import { DEALERS } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 interface LeadFormProps {
   vehicle: Vehicle;
   variant: VehicleVariant;
+  /** Concesionarios activos — del catálogo (DB); hoy uno solo (Barquisimeto). */
+  dealers: Array<{ id: string; city: string; active: boolean }>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
@@ -24,7 +25,7 @@ const CHANNELS: { id: ContactChannel; label: string }[] = [
 ];
 
 /** Formulario "Me interesa este vehículo" — capturado en la conversación. */
-export function LeadForm({ vehicle, variant, open, onOpenChange, onSuccess }: LeadFormProps) {
+export function LeadForm({ vehicle, variant, dealers, open, onOpenChange, onSuccess }: LeadFormProps) {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -37,11 +38,17 @@ export function LeadForm({ vehicle, variant, open, onOpenChange, onSuccess }: Le
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const payload: LeadPayload = {
+    // Honeypot anti-spam (TRD §6.1): campo invisible para humanos; los bots
+    // que rellenan todo lo delatan. Se envía junto al payload.
+    const honeypot =
+      (e.currentTarget as HTMLFormElement).querySelector<HTMLInputElement>('input[name="website"]')
+        ?.value ?? "";
+    const payload: LeadPayload & { website?: string } = {
+      website: honeypot,
       fullName,
       phone,
       email,
-      dealerId: DEALERS[0].id,
+      dealerId: dealers[0].id,
       contactChannel: channel,
       wantsTestDrive,
       vehicleSlug: vehicle.slug,
@@ -92,6 +99,16 @@ export function LeadForm({ vehicle, variant, open, onOpenChange, onSuccess }: Le
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-4">
+          {/* Honeypot: invisible y fuera del orden de tabulación — un humano
+              jamás lo llena; un bot que rellena todo, sí. */}
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="hidden"
+          />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="fullName">Nombre completo</Label>
             <Input

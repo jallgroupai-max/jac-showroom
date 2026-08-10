@@ -71,6 +71,9 @@ export interface PointOfInterest {
    * detalle que aparece junto al vehículo. Sin esto, el panel muestra solo
    * título y descripción. */
   image?: string;
+  /** Ritmo del anillo del marker de interior — configurable desde el panel
+   * de administración. Ausente = "soft" (el comportamiento de siempre). */
+  blink?: "soft" | "fast" | "none";
   /** Posición del ícono flotante SOBRE la panorámica 360 del interior —
    * coordenadas en píxeles de la textura equirectangular original (no del
    * viewport). Solo aplica en interior; en exterior el punto de interés se
