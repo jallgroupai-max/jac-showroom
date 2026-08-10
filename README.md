@@ -4,12 +4,28 @@ Frontend Next.js del showroom virtual 360° de JAC Motors. Vive en `frontend/` d
 
 ## Correr en local
 
+La app son **dos procesos** más Postgres — el panel de administración no funciona completo sin los tres:
+
 ```bash
+docker compose up -d postgres   # 1. base de datos
 npm install
-npm run dev
+npm run dev                     # 2. web (showroom + panel) — http://localhost:3000
+npm run worker                  # 3. worker de assets, en OTRA terminal
 ```
 
-Abrir [http://localhost:3000](http://localhost:3000).
+El worker (`worker/index.mjs`) es un proceso Node aparte de Next que procesa en cola los ZIP de fotogramas 360° subidos en el paso 3 del wizard (extracción, validación y compresión con sharp) y ejecuta la purga diaria de vehículos archivados. **Si no está corriendo, las subidas de ZIP quedan "en cola" para siempre** — es el síntoma típico de haber olvidado la tercera terminal.
+
+Variables en `.env` (ver `.env.example`): `DATABASE_URL`, `AUTH_SECRET`, credenciales del seed (`SEED_ADMIN_*`). Seed inicial: `npm run db:migrate && npm run db:seed`.
+
+## Despliegue con Docker
+
+`docker compose up -d --build` levanta los tres servicios:
+
+- **postgres** — base de datos (volumen `pgdata`).
+- **showroom** — la web Next.js en modo standalone (puerto `${PORT:-3000}`).
+- **worker** — misma imagen base construida con `target: worker` (etapa propia del `Dockerfile`); procesa los ZIP y la purga. Sin este servicio las subidas del paso 3 no se procesan.
+
+`showroom` y `worker` comparten el volumen `uploads` montado en `/app/uploads-data`: la web guarda ahí lo que se sube desde el panel y el worker escribe los sprites procesados que la web luego sirve vía `/uploads/*`. La `DATABASE_URL` interna apunta al host `postgres` de la red de compose; `AUTH_SECRET` es obligatoria y se toma de `.env` (compose falla con un mensaje claro si falta).
 
 ## Estado del proyecto
 

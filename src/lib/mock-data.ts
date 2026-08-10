@@ -338,13 +338,20 @@ export function getVehiclesByCategory(categorySlug: string): Vehicle[] {
   return VEHICLES.filter((v) => v.categorySlug === categorySlug).sort((a, b) => a.order - b.order);
 }
 
-/** URL de un ícono suelto de recursos/Iconos servido desde /public. */
+/** URL de un ícono suelto de recursos/Iconos servido desde /public.
+ * Pass-through para referencias que YA son una URL completa (data-URI o ruta
+ * absoluta) — así el catálogo real de la DB puede servir íconos sin archivo
+ * (dibujados desde su path SVG) por el mismo camino. */
 export function iconAssetUrl(name: string): string {
+  if (name.startsWith("data:") || name.startsWith("/")) return name;
   return `/assets/icons/${name}.svg`;
 }
 
-/** URL de la imagen grande de un punto de interés (panel de detalle). */
+/** URL de la imagen grande de un punto de interés (panel de detalle).
+ * Mismo pass-through: las imágenes subidas desde el panel llegan como URL
+ * absoluta (/uploads/…). */
 export function poiImageAssetUrl(name: string): string {
+  if (name.startsWith("data:") || name.startsWith("/")) return name;
   return `/assets/poi/${name}.png`;
 }
 
@@ -356,9 +363,14 @@ export function poiImageAssetUrl(name: string): string {
  * la silueta de no-disponible. Deduplicado — varios vehículos comparten
  * íconos y background.
  */
-export function getPreloadAssetUrls(): string[] {
+export function getPreloadAssetUrls(
+  // Catálogo a precargar — el vivo (hidratado de la DB) o, por defecto, el
+  // mock (fixture de desarrollo).
+  vehicles: Vehicle[] = VEHICLES,
+  scenes: Scene[] = [...SCENES, ...CUSTOM_SCENES],
+): string[] {
   const urls = new Set<string>();
-  for (const v of VEHICLES) {
+  for (const v of vehicles) {
     urls.add(v.cardImageUrl ?? v.variants[0].thumbnailUrl);
     // Miniaturas del selector de colores (frame 25 del set LOW de cada
     // color): el Loading ya no descarga los sets low cuando el umbral de
@@ -381,7 +393,7 @@ export function getPreloadAssetUrls(): string[] {
       : (v.interior.imageUrlMobile ?? v.interior.imageUrl);
     if (interiorUrl) urls.add(interiorUrl);
   }
-  for (const scene of [...SCENES, ...CUSTOM_SCENES]) {
+  for (const scene of scenes) {
     if (scene.imageUrl) urls.add(scene.imageUrl);
   }
   urls.add(UNAVAILABLE_VEHICLE_IMAGE);

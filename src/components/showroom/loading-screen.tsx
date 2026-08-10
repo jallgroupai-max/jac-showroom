@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import type { Vehicle } from "@/lib/types";
+import type { Scene, Vehicle } from "@/lib/types";
 import { readyThresholdForTier, useConnectionTier } from "@/lib/connection";
 import { getPreloadAssetUrls } from "@/lib/mock-data";
 import {
@@ -20,6 +20,10 @@ const LOGO_URL = "/assets/logo.webp";
 interface LoadingScreenProps {
   /** Vehículo inicial — se precargan TODOS sus colores antes de entrar. */
   vehicle: Vehicle;
+  /** Catálogo completo (Fase A5: viene hidratado de la DB) — de acá salen
+   * las cards, íconos y backgrounds a precargar. */
+  vehicles: Vehicle[];
+  scenes: Scene[];
   onReady: () => void;
 }
 
@@ -37,7 +41,7 @@ interface LoadingScreenProps {
  * Recién al llegar a 100% aparece el botón "Ingresar": la entrada al
  * showroom es MANUAL (clic del usuario), no automática.
  */
-export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
+export function LoadingScreen({ vehicle, vehicles, scenes, onReady }: LoadingScreenProps) {
   // Se mide el throughput real descargando el primer frame en baja calidad.
   const sampleUrl = vehicle.variants[0]?.exteriorSprites
     .find((s) => s.quality === "low")
@@ -45,7 +49,7 @@ export function LoadingScreen({ vehicle, onReady }: LoadingScreenProps) {
   const tier = useConnectionTier(sampleUrl);
   const threshold = readyThresholdForTier(tier);
 
-  const staticAssets = useMemo(() => getPreloadAssetUrls(), []);
+  const staticAssets = useMemo(() => getPreloadAssetUrls(vehicles, scenes), [vehicles, scenes]);
   const [staticLoaded, setStaticLoaded] = useState(0);
   const [staticDone, setStaticDone] = useState(false);
   const [spriteLoaded, setSpriteLoaded] = useState(0);

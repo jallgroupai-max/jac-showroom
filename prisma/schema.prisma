@@ -1,0 +1,383 @@
+// Esquema de datos del panel de administración — docs/ADMIN-IMPLEMENTATION-PLAN.md §1.
+// Modela TODO lo que el showroom público ya consume (src/lib/types.ts), no solo
+// lo que el wizard captura: specs, garantía, orden, fondo propio, etc.
+// mock-data.ts se convierte en el primer seed (plan §3, A5) — no se borra.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: la URL de conexión NO va aquí — vive en prisma.config.ts (CLI/
+// migraciones) y en el adapter del constructor de PrismaClient (runtime).
+datasource db {
+  provider = "postgresql"
+}
+
+// ————————————————————————————————————————————————————————————————
+// Usuarios y auditoría
+// ————————————————————————————————————————————————————————————————
+
+// Permisos planos (plan §2.1): un solo rol — todo usuario autenticado puede
+// crear/editar/pausar/eliminar. Sin jerarquía; la red de seguridad es AuditLog.
+model AdminUser {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  passwordHash String // Argon2id
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
+  uploadJobs   UploadJob[]
+}
+
+// Con permisos planos y varias personas operando, la bitácora es lo único que
+// permite reconstruir un cambio no deseado (plan §2.1, A6).
+model AuditLog {
+  id         String    @id @default(cuid())
+  user       AdminUser @relation(fields: [userId], references: [id])
+  userId     String
+  action     String // "publish" | "pause" | "archive" | "update" | ...
+  entityType String // "Vehicle" | "Scenario" | ...
+  entityId   String
+  detail     Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ————————————————————————————————————————————————————————————————
+// Catálogos compartidos
+// ————————————————————————————————————————————————————————————————
+
+model Category {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  name     String // "Sedán" — typeTag del showroom se DERIVA: `${name} · ${trimLabel}` (plan §1.9)
+  order    Int       @default(0)
+  vehicles Vehicle[]
+}
+
+// Un solo catálogo de íconos, dos usos (plan §1.2): característica de la card
+// (featureIcons) y punto de interés. GENERAL cubre los que no son de un modo
+// concreto (diésel, gasolina, eléctrico, 4x4).
+enum HotspotGroup {
+  EXTERIOR
+  INTERIOR
+  GENERAL
+}
+
+model HotspotIcon {
+  id    String       @id @default(cuid())
+  key   String       @unique // "motor", "rines", "diesel"...
+  label String
+  group HotspotGroup
+  // Path SVG (atributo `d`, viewBox 24×24, stroke) — así es como el prototipo
+  // define sus íconos; un catálogo de paths evita gestionar archivos.
+  svgPath String
+  // Nombre del SVG real en /assets/icons (recursos/Iconos) — el showroom
+  // público validado pixel-a-pixel usa ESOS archivos. Con assetName, el
+  // adapter público sirve el archivo real; sin él, cae a un data-URI del
+  // svgPath (íconos creados desde el panel sin SVG de diseño todavía).
+  assetName String?
+  order     Int     @default(0)
+  vehicleFeatures  VehicleFeatureIcon[]
+  pointsOfInterest PointOfInterest[]
+}
+
+// ————————————————————————————————————————————————————————————————
+// Vehículo
+// ————————————————————————————————————————————————————————————————
+
+// draft: nunca publicado, invisible en público (404 incluso por URL directa —
+//   la revisión es vía token de preview). published: en catálogo. paused:
+//   retirado temporalmente conservando todo. archived: borrado lógico con
+//   purga diferida de assets (plan §1.8).
+enum VehicleStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  ARCHIVED
+}
+
+model Vehicle {
+  id             String        @id @default(cuid())
+  // Editable solo en DRAFT; se congela al publicar (plan §1.9).
+  slug           String        @unique
+  status         VehicleStatus @default(DRAFT)
+  commercialName String // ej. "Aventura 4X4"
+  technicalName  String // ej. "Frison T9 4X4" — el lead envía AMBOS nombres
+  trimLabel      String // ej. "Gasolina Automática" ("Versión" en el wizard)
+  // Texto de la card del catálogo. La derivación `${categoría} · ${trim}`
+  // NO cubre los datos validados pixel-a-pixel (mock: trim "Sedán" con card
+  // "Sedán · Automático") — se almacena; el wizard lo prellena derivado.
+  typeTag        String        @default("")
+  category       Category      @relation(fields: [categoryId], references: [id])
+  categoryId     String
+  order          Int           @default(0)
+  warrantyLabel  String        @default("")
+  // Nullable: si falta, la card usa el frame 25 del primer color (como hoy).
+  cardImageUrl   String?
+  // Fondo "propio" del vehículo — default del selector de Escena (TRD §4.5).
+  ownBackgroundUrl String?
+
+  // Interior = panorámica equirectangular 2:1 (plan §1.4). La variante mobile
+  // (≤4096px) la genera el pipeline, no la sube el usuario.
+  interiorPanoramaUrl       String?
+  interiorPanoramaMobileUrl String?
+  // Dimensiones de la panorámica desktop — el adapter público convierte las
+  // coordenadas normalizadas 0–1 de los POIs a píxeles de textura (§1.5).
+  interiorPanoramaWidth  Int?
+  interiorPanoramaHeight Int?
+
+  featureIcons     VehicleFeatureIcon[]
+  colors           VehicleColor[]
+  specGroups       SpecGroup[]
+  pointsOfInterest PointOfInterest[]
+  scenarios        VehicleScenario[]
+
+  publishedAt DateTime?
+  archivedAt  DateTime? // marca el inicio del periodo de gracia pre-purga
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, order])
+}
+
+// Íconos rápidos de la card del catálogo (types.ts: featureIcons), con orden.
+model VehicleFeatureIcon {
+  vehicle       Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId     String
+  hotspotIcon   HotspotIcon @relation(fields: [hotspotIconId], references: [id])
+  hotspotIconId String
+  order         Int         @default(0)
+
+  @@id([vehicleId, hotspotIconId])
+}
+
+// ————————————————————————————————————————————————————————————————
+// Colores (variantes) y pipeline de assets
+// ————————————————————————————————————————————————————————————————
+
+model VehicleColor {
+  id        String  @id @default(cuid())
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId String
+  colorSlug String // "blanco" — carpeta en storage (plan §2.2)
+  colorName String // "Blanco Perla"
+  colorHex  String // "#F2F3F5"
+  order     Int     @default(0)
+  // Derivada del frame 25 al terminar el job (plan §1.3); el campo existe
+  // para que un override manual futuro no requiera migración.
+  profileImageUrl String?
+  // Ruta base low/medium/high en storage. Null = galería aún no procesada;
+  // un color sin esto BLOQUEA la publicación (plan §2.3).
+  spriteBasePath String?
+  frameCount     Int     @default(36)
+  // "Un solo job activo por color" (Req 4) — respaldo en datos del rechazo
+  // que también hace la API.
+  activeJobId String? @unique
+
+  jobs UploadJob[]
+
+  // Índice único del artefacto: hace cumplir "un .zip por color" en la DB.
+  @@unique([vehicleId, colorSlug])
+}
+
+enum JobType {
+  COLOR_ZIP
+  INTERIOR_PANORAMA
+  SCENARIO_IMAGE
+}
+
+enum JobStatus {
+  QUEUED
+  EXTRACTING
+  COMPRESSING
+  DONE
+  ERROR
+}
+
+// Dos familias de fallo (plan §2.4) — deciden qué acción ofrece la UI:
+// TRANSIENT → "Reintentar" (mismo archivo puede procesarse bien);
+// VALIDATION → "Reemplazar archivo" (el mismo archivo fallará idéntico).
+enum JobErrorKind {
+  TRANSIENT
+  VALIDATION
+}
+
+// Los trabajos sobreviven a la sesión (plan §2.3): cerrar el navegador con
+// cinco colores procesándose es un caso normal, no un error.
+model UploadJob {
+  id       String    @id @default(cuid())
+  type     JobType
+  status   JobStatus @default(QUEUED)
+  progress Int       @default(0) // 0–100
+  // Accionable: "faltan los fotogramas 012 y 019", no "error" (plan §2.4).
+  errorMessage String?
+  errorKind    JobErrorKind?
+  attempts     Int           @default(0)
+  // ZIP/imagen original en storage temporal; se conserva hasta que el job
+  // termina bien o se descarta — así "Reintentar" no vuelve a subir nada.
+  sourceUrl String
+
+  vehicleColor   VehicleColor? @relation(fields: [vehicleColorId], references: [id], onDelete: SetNull)
+  vehicleColorId String?
+  // Para INTERIOR_PANORAMA (vehículo) y SCENARIO_IMAGE (escenario).
+  vehicleId  String?
+  scenarioId String?
+
+  createdBy   AdminUser @relation(fields: [createdById], references: [id])
+  createdById String
+
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
+// ————————————————————————————————————————————————————————————————
+// Puntos de interés (incluye los "destacados")
+// ————————————————————————————————————————————————————————————————
+
+enum PoiMode {
+  EXTERIOR
+  INTERIOR
+}
+
+enum PoiBlink {
+  SOFT
+  FAST
+  NONE
+}
+
+// Una sola tabla para destacado + punto de interés: en el showroom el punto
+// de exterior ABRE el destacado (poi-detail-panel), son la misma entidad vista
+// desde dos pasos del wizard (paso 4 edita contenido, paso 5 posiciona).
+model PointOfInterest {
+  id          String   @id @default(cuid())
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId   String
+  mode        PoiMode
+  icon        HotspotIcon @relation(fields: [iconId], references: [id])
+  iconId      String
+  title       String
+  description String   @default("")
+  imageUrl    String?
+  order       Int      @default(0)
+  // EXTERIOR: fotograma (1–36) al que rota el vehículo al abrirlo.
+  frame Int?
+  // INTERIOR: posición sobre la panorámica, NORMALIZADA 0–1 (plan §1.5) —
+  // sobrevive a re-subir la panorámica en otra resolución. El adapter la
+  // convierte a píxeles de textura al servir.
+  textureX Float?
+  textureY Float?
+  // Configurable desde el panel; el marcador del visor lo lee (decisión:
+  // "todo se debe incluir").
+  blink PoiBlink @default(SOFT)
+
+  @@index([vehicleId, mode, order])
+}
+
+// ————————————————————————————————————————————————————————————————
+// Especificaciones
+// ————————————————————————————————————————————————————————————————
+
+model SpecGroup {
+  id        String     @id @default(cuid())
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId String
+  title     String // "Motor", "Transmisión", "Dimensiones"...
+  order     Int        @default(0)
+  items     SpecItem[]
+}
+
+model SpecItem {
+  id          String    @id @default(cuid())
+  specGroup   SpecGroup @relation(fields: [specGroupId], references: [id], onDelete: Cascade)
+  specGroupId String
+  label       String
+  value       String
+  order       Int       @default(0)
+}
+
+// ————————————————————————————————————————————————————————————————
+// Escenarios (catálogo global, plan §1.7)
+// ————————————————————————————————————————————————————————————————
+
+// Dos tipos de entrada: imagen (imageUrl) o color sólido (color) — las escenas
+// de color sólido SOBREVIVEN. Exactamente uno de los dos debe estar presente
+// (validado en la API; un CHECK en DB puede añadirse por migración SQL).
+model Scenario {
+  id       String  @id @default(cuid())
+  label    String
+  imageUrl String?
+  color    String? // hex — paleta neutra que ya usa el showroom
+  isGlobal Boolean @default(true)
+  order    Int     @default(0)
+
+  vehicles  VehicleScenario[]
+  createdAt DateTime          @default(now())
+}
+
+model VehicleScenario {
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId  String
+  scenario   Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  scenarioId String
+  enabled    Boolean  @default(true)
+
+  @@id([vehicleId, scenarioId])
+}
+
+// ————————————————————————————————————————————————————————————————
+// Leads y concesionarios (TRD §5/§6 — la bandeja llega en A6, la tabla ya)
+// ————————————————————————————————————————————————————————————————
+
+model Dealer {
+  id     String  @id @default(cuid())
+  city   String // hoy solo "Barquisimeto"; entidad modelada desde ya (TRD §5)
+  active Boolean @default(true)
+  leads  Lead[]
+}
+
+enum ContactChannel {
+  WHATSAPP
+  CALL
+  EMAIL
+}
+
+enum LeadOrigin {
+  MOBILE
+  DESKTOP
+}
+
+enum LeadSyncStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// Persistencia local ANTES de intentar Odoo (TRD §6.2) — un lead nunca se
+// pierde por caída del CRM. syncStatus alimenta el reintento y la bandeja A6.
+model Lead {
+  id                    String         @id @default(cuid())
+  fullName              String
+  phone                 String
+  email                 String
+  dealer                Dealer         @relation(fields: [dealerId], references: [id])
+  dealerId              String
+  contactChannel        ContactChannel
+  wantsTestDrive        Boolean        @default(false)
+  vehicleSlug           String
+  vehicleCommercialName String
+  vehicleTechnicalName  String
+  variantColorName      String
+  origin                LeadOrigin
+  syncStatus            LeadSyncStatus @default(PENDING)
+  syncAttempts          Int            @default(0)
+  createdAt             DateTime       @default(now())
+
+  @@index([syncStatus, createdAt])
+}

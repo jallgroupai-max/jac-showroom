@@ -1,0 +1,49 @@
+/* Tokens del panel de administración — extraídos del prototipo
+   jac_showroom_admin_front/Admin Vehiculos.dc.html (plan §0.6).
+   Sistema deliberadamente DISTINTO al del showroom público: blanco/negro,
+   Plus Jakarta Sans, pills de 999px y cards de 18px. No cruzar tokens. */
+
+.admin-root {
+  --adm-bg: #ffffff;
+  --adm-ink: #000000;
+  --adm-ink-soft: #555555;
+  --adm-muted: #777777;
+  --adm-faint: #8a8a8a;
+  --adm-fainter: #9a9a9a;
+  --adm-line: #e6e6e6;
+  --adm-line-soft: #ececec;
+  --adm-border-input: #dcdcdc;
+  --adm-border-swatch: #d4d4d4;
+  --adm-surface: #f4f4f4;
+  --adm-surface-soft: #fcfcfc;
+  --adm-hover: #262626;
+
+  --adm-radius-card: 18px;
+  --adm-radius-input: 12px;
+  --adm-radius-pill: 999px;
+
+  background: var(--adm-bg);
+  color: var(--adm-ink);
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Estilo de enlace de texto OPT-IN (.adm-link), nunca un selector global
+   sobre `a`: una regla `.admin-root a` (especificidad 0,1,1) le gana a las
+   utilidades de Tailwind (0,1,0) y pintaba de negro el texto de los enlaces-
+   píldora activos con fondo negro — texto invisible. */
+.admin-root .adm-link {
+  color: var(--adm-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-root .adm-link:hover {
+  color: var(--adm-ink-soft);
+}
+
+.admin-root input:focus,
+.admin-root textarea:focus {
+  outline: none;
+  border-color: var(--adm-ink);
+}

@@ -165,6 +165,14 @@
   opacity: 0;
   animation: poi-marker-ripple 2.2s ease-out infinite;
 }
+/* Variantes de ritmo configurables desde el panel (PointOfInterest.blink):
+   "soft" es la clase base de siempre — estas solo la modulan. */
+.poi-marker-ripple--fast {
+  animation-duration: 0.9s;
+}
+.poi-marker-ripple--none {
+  animation: none;
+}
 @keyframes poi-marker-ripple {
   0% {
     transform: scale(1);

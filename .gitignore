@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# assets subidos desde el panel (storage local — servidos por
+# src/app/uploads/[...path]/route.ts, fuera de public/ a propósito)
+/uploads-data/
 
 # vercel
 .vercel

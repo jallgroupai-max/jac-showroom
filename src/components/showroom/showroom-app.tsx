@@ -3,15 +3,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { MarkerAnchor, Scene, ViewMode } from "@/lib/types";
-import {
-  CATEGORIES,
-  CUSTOM_SCENES,
-  DEFAULT_VEHICLE_SLUG,
-  SCENES,
-  getVehicleBySlug,
-  getVehiclesByCategory,
-  isVehicleAvailable,
-} from "@/lib/mock-data";
+import { isVehicleAvailable } from "@/lib/mock-data";
+import { hydrateCatalog, type CatalogDTO } from "@/lib/catalog-dto";
 import { spriteCacheKey } from "@/lib/sprite-cache";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { cn } from "@/lib/utils";
@@ -31,6 +24,9 @@ type SubPhase = "catalog" | "visualizer";
 
 interface ShowroomAppProps {
   initialVehicleSlug?: string;
+  /** Catálogo serializable armado en el servidor (Fase A5) — se hidrata acá
+   * a los tipos de siempre (plan §1.6: frameUrl no cruza la frontera RSC). */
+  catalog: CatalogDTO;
 }
 
 // Corte "desktop" — mismo breakpoint que el `lg` de Tailwind (1024px),
@@ -68,8 +64,13 @@ function getDesktopSnapshot(): boolean {
  *   barra nueva en flujo normal, debajo del catálogo/controles (NO fija ni
  *   flotante), y el header solo muestra logo + título.
  */
-export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
-  const startVehicle = getVehicleBySlug(initialVehicleSlug ?? "") ?? getVehicleBySlug(DEFAULT_VEHICLE_SLUG)!;
+export function ShowroomApp({ initialVehicleSlug, catalog }: ShowroomAppProps) {
+  // Hidratación única del catálogo — misma forma que antes tenía mock-data,
+  // los componentes de abajo no distinguen el origen.
+  const cat = useMemo(() => hydrateCatalog(catalog), [catalog]);
+  const getVehicleBySlug = (slug: string) => cat.vehicles.find((v) => v.slug === slug);
+  const startVehicle =
+    getVehicleBySlug(initialVehicleSlug ?? "") ?? getVehicleBySlug(cat.defaultSlug)!;
 
   const [phase, setPhase] = useState<"loading" | "app">("loading");
   // subPhase explícito: null hasta que el usuario interactúa (cambia de
@@ -81,7 +82,10 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
   const [activeVehicleSlug, setActiveVehicleSlug] = useState(startVehicle.slug);
   const [activeVariantId, setActiveVariantId] = useState(startVehicle.variants[0].id);
   const [viewMode, setViewMode] = useState<ViewMode>("exterior");
-  const [sceneId, setSceneId] = useState<Scene["id"]>("own");
+  // Al entrar por primera vez se muestra el background CLARO (pedido
+  // explícito) — el fondo "propio" del vehículo queda como opción del
+  // selector de Escena, ya no como default.
+  const [sceneId, setSceneId] = useState<Scene["id"]>("light");
   const [specsOpen, setSpecsOpen] = useState(false);
   const [leadFormOpen, setLeadFormOpen] = useState(false);
   const [leadConfirmationOpen, setLeadConfirmationOpen] = useState(false);
@@ -164,7 +168,13 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
 
   const vehicle = getVehicleBySlug(activeVehicleSlug) ?? startVehicle;
   const variant = vehicle.variants.find((v) => v.id === activeVariantId) ?? vehicle.variants[0];
-  const vehiclesInCategory = useMemo(() => getVehiclesByCategory(activeCategorySlug), [activeCategorySlug]);
+  const vehiclesInCategory = useMemo(
+    () =>
+      cat.vehicles
+        .filter((v) => v.categorySlug === activeCategorySlug)
+        .sort((a, b) => a.order - b.order),
+    [cat.vehicles, activeCategorySlug],
+  );
 
   // Interior disponible = sprites 360° o foto única. Si el vehículo activo
   // no lo tiene, la vista EFECTIVA cae a exterior aunque el estado siga en
@@ -208,8 +218,14 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
         : (vehicle.interior.imageUrlMobile ?? vehicle.interior.imageUrl)
       : undefined;
   const cacheKey = spriteCacheKey(vehicle.slug, effectiveViewMode === "exterior" ? activeVariantId : "interior");
+  // Escenarios personalizados habilitados para ESTE vehículo (Req 8) — el
+  // catálogo global filtrado por la selección hecha en el panel.
+  const vehicleCustomScenes = useMemo(() => {
+    const enabledIds = cat.scenarioIdsBySlug[vehicle.slug] ?? [];
+    return cat.customScenes.filter((s) => enabledIds.includes(s.id));
+  }, [cat, vehicle.slug]);
   const activeScene =
-    sceneId === "own" ? undefined : [...SCENES, ...CUSTOM_SCENES].find((s) => s.id === sceneId);
+    sceneId === "own" ? undefined : [...cat.scenes, ...vehicleCustomScenes].find((s) => s.id === sceneId);
   const backgroundColor = activeScene?.color;
   const backgroundUrl = backgroundColor ? undefined : (activeScene?.imageUrl ?? vehicle.ownBackgroundUrl);
   // El panel de detalle aplica en AMBOS modos — en exterior además corre el
@@ -261,7 +277,14 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
     // El Loading precarga TODOS los colores del vehículo inicial (hasta la
     // calidad que dicte la conexión) más cards/íconos/backgrounds — ver
     // loading-screen.tsx.
-    return <LoadingScreen vehicle={startVehicle} onReady={() => setPhase("app")} />;
+    return (
+      <LoadingScreen
+        vehicle={startVehicle}
+        vehicles={cat.vehicles}
+        scenes={[...cat.scenes, ...cat.customScenes]}
+        onReady={() => setPhase("app")}
+      />
+    );
   }
 
   return (
@@ -480,7 +503,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
               className="h-auto lg:h-[25rem] lg:w-screen lg:ml-[calc(50%-50vw)]"
             >
               <CatalogPanel
-                categories={CATEGORIES}
+                categories={cat.categories}
                 activeCategorySlug={activeCategorySlug}
                 onCategoryChange={changeCategory}
                 vehicles={vehiclesInCategory}
@@ -520,8 +543,8 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
                 onViewModeChange={changeViewMode}
                 activeVariantId={activeVariantId}
                 onVariantChange={setActiveVariantId}
-                scenes={SCENES}
-                customScenes={CUSTOM_SCENES}
+                scenes={cat.scenes}
+                customScenes={vehicleCustomScenes}
                 activeSceneId={sceneId}
                 onSceneChange={setSceneId}
                 // Al abrir el selector de vehículos SIEMPRE se vuelve a
@@ -560,6 +583,7 @@ export function ShowroomApp({ initialVehicleSlug }: ShowroomAppProps) {
       <LeadForm
         vehicle={vehicle}
         variant={variant}
+        dealers={cat.dealers}
         open={leadFormOpen}
         onOpenChange={setLeadFormOpen}
         onSuccess={() => {
