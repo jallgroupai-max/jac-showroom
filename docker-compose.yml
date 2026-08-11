@@ -1,73 +1,35 @@
-# Despliegue del showroom 360° — `docker compose up -d --build`.
-# El puerto publicado se puede cambiar sin editar el archivo:
-#   PORT=8080 docker compose up -d   (por defecto 3000)
-services:
-  # Base de datos del panel de administración (plan A0). En desarrollo basta
-  # con este servicio: `docker compose up -d postgres`.
-  postgres:
-    image: postgres:17-alpine
-    container_name: jac-postgres
-    environment:
-      POSTGRES_USER: jac
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jac_dev}
-      POSTGRES_DB: jac_showroom
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jac -d jac_showroom"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
+
+services:
   showroom:
     build: .
     image: jac-showroom:latest
     container_name: jac-showroom
     ports:
-      - "${PORT:-3000}:3000"
-    environment:
-      # Dentro de la red de compose el host es `postgres`, no localhost.
-      DATABASE_URL: postgresql://jac:${POSTGRES_PASSWORD:-jac_dev}@postgres:5432/jac_showroom
-      AUTH_SECRET: ${AUTH_SECRET:?Define AUTH_SECRET en .env}
-    volumes:
-      # Compartido con el worker: la web guarda los ZIP/imágenes subidos y el
-      # worker escribe ahí los sprites procesados que la web luego sirve.
-      - uploads:/app/uploads-data
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - "${PORT_WEB:-4000}:3000"
     restart: unless-stopped
-    # wget de busybox (viene en alpine — la imagen no trae curl).
+    
+    networks:
+      - showroom_network
+    
+    volumes:
+      - showroom_volume:/app/data  
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${PORT_WEB:-4000}/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 15s
 
-  # Procesa los ZIP de colores (extracción + compresión de sprites) y la
-  # purga diaria de vehículos archivados. SIN este servicio, las subidas del
-  # paso 3 del wizard quedan en cola para siempre. Equivalente local:
-  # `npm run worker` en una terminal aparte.
-  worker:
-    build:
-      context: .
-      target: worker
-    image: jac-showroom-worker:latest
-    container_name: jac-worker
-    environment:
-      DATABASE_URL: postgresql://jac:${POSTGRES_PASSWORD:-jac_dev}@postgres:5432/jac_showroom
-      ARCHIVE_GRACE_DAYS: ${ARCHIVE_GRACE_DAYS:-30}
-    volumes:
-      - uploads:/app/uploads-data
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
+
+networks:
+  showroom_network:
+    name: showroom_network
+    driver: bridge
+    external: true 
+
 
 volumes:
-  pgdata:
-  uploads:
+  showroom_volume:
+    name: showroom_volume
+    external: true  
