@@ -1,6 +1,41 @@
-
+# Despliegue:
+#   docker compose --env-file environments/.env run --rm migrate
+#   docker compose --env-file environments/.env run --rm seed
+#   docker compose --env-file environments/.env up -d --build
+# (el .env vive en environments/, no en la raíz — así lo pide la
+# estructura de DevOps. Sin --env-file, ${...} abajo quedan sin resolver.
+# migrate y seed corren ANTES de levantar showroom, en ese orden — seed
+# es idempotente (upsert), así que correrlo de nuevo en cada deploy no
+# duplica ni resetea datos existentes.)
 
 services:
+  migrate:
+    build:
+      context: .
+      target: migrator
+    image: jac-showroom-migrate:latest
+    container_name: jac-showroom-migrate
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - showroom_network
+    restart: "no"
+
+  seed:
+    build:
+      context: .
+      target: seeder
+    image: jac-showroom-seed:latest
+    container_name: jac-showroom-seed
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SEED_ADMIN_EMAIL=${SEED_ADMIN_EMAIL}
+      - SEED_ADMIN_NAME=${SEED_ADMIN_NAME}
+      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
+    networks:
+      - showroom_network
+    restart: "no"
+
   showroom:
     build: .
     image: jac-showroom:latest
@@ -8,12 +43,18 @@ services:
     ports:
       - "${PORT_WEB:-4000}:3000"
     restart: unless-stopped
-    
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+      - POSTGRES_DB=${POSTGRES_DB}
+    secrets:
+      - db_password
     networks:
       - showroom_network
-    
     volumes:
-      - showroom_volume:/app/data  
+      - showroom_volume:/app/data
+      - uploads_data:/app/uploads-data
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${PORT_WEB:-4000}/"]
       interval: 30s
@@ -21,15 +62,20 @@ services:
       retries: 3
       start_period: 15s
 
+secrets:
+  db_password:
+    file: ../secrets/db_password.txt
 
 networks:
   showroom_network:
     name: showroom_network
     driver: bridge
-    external: true 
-
+    external: true
 
 volumes:
   showroom_volume:
     name: showroom_volume
-    external: true  
+    external: true
+  uploads_data:
+    name: uploads_data
+    external: true

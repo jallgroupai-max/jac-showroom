@@ -57,6 +57,35 @@ RUN addgroup --system --gid 1001 nodejs \
 USER nextjs
 CMD ["node", "worker/index.mjs"]
 
+# ---- migrator: aplica las migraciones de Prisma antes del deploy ----
+# Mismo motivo que worker: el trace standalone del runner NO incluye la CLI
+# de Prisma (nada del server la importa en runtime), así que `prisma migrate
+# deploy` corre en un stage aparte con el node_modules completo de deps.
+# Se construye con `target: migrator` y se ejecuta como job de un solo uso
+# (docker compose run --rm migrate) ANTES de levantar el servicio showroom.
+FROM node:22-alpine AS migrator
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json prisma.config.ts ./
+COPY prisma ./prisma
+CMD ["npx", "prisma", "migrate", "deploy"]
+
+# ---- seeder: admin, categorías, dealer e íconos de hotspot ----
+# prisma/seed.mjs es idempotente (upsert) — correrlo en cada deploy no
+# duplica ni resetea datos existentes. Necesita el cliente de Prisma
+# generado (no solo el stub) porque hace queries reales, a diferencia de
+# migrator. Se ejecuta con `target: seeder` como job de un solo uso
+# (docker compose run --rm seed), típicamente DESPUÉS de migrate.
+FROM node:22-alpine AS seeder
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json prisma.config.ts ./
+COPY prisma ./prisma
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
+CMD ["node", "prisma/seed.mjs"]
+
 # ---- runner: imagen final mínima ----
 FROM node:22-alpine AS runner
 WORKDIR /app
