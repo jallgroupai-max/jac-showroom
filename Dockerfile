@@ -24,6 +24,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Activa output:"standalone" solo acá (ver next.config.ts) — el flujo local
 # de `npm run build` + `npm run start` no cambia.
 ENV BUILD_STANDALONE=1
+# Sin esto el build usa el cliente stub de @prisma/client (nunca generado) —
+# el chequeo de tipos falla en cualquier prisma.$transaction(async (tx) =>
+# ...) con "tx implicitly has an any type" porque faltan los tipos reales.
+# Mismo placeholder que el stage worker: prisma.config.ts exige DATABASE_URL
+# al cargarse; la URL real llega por environment en runtime.
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
 RUN npm run build
 
 # ---- worker: procesa los ZIP de colores y la purga diaria ----
