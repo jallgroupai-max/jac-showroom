@@ -1,19 +1,26 @@
 // Pipeline de un ZIP de color (plan §2.3): extraer en streaming, validar 36
-// fotogramas, derivar LOW/MEDIUM/HIGH en WebP, swap atómico y limpieza.
-// Cada paso es idempotente: si el worker muere a la mitad, re-ejecutar el job
+// fotogramas, derivar LOW/MEDIUM/HIGH en WebP, publicar y limpieza. Cada
+// paso es idempotente: si el worker muere a la mitad, re-ejecutar el job
 // desde cero produce el mismo resultado.
-import { mkdir, rm, rename, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, rm, rename, readdir, stat, writeFile, readFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
 import path from "node:path";
 import unzipper from "unzipper"; // CJS — sin named exports en ESM
 import sharp from "sharp";
+import {
+  S3_MODE,
+  UPLOADS_ROOT,
+  saveObject,
+  deleteObject,
+  deleteObjectsByPrefix,
+  getObjectStream,
+} from "../src/lib/storage-engine.mjs";
 
 // Windows: sharp/libvips cachea descriptores de archivo — sin esto, los
 // archivos de entrada quedan bloqueados (EBUSY) al intentar borrarlos.
 sharp.cache(false);
-
-// Mismo root que src/lib/storage.ts — fuera de public/ (Next no sirve
-// archivos añadidos a public/ tras el build; van por el route handler).
-const UPLOADS_ROOT = path.join(process.cwd(), "uploads-data");
 
 // Targets calibrados contra recursos/QUALITYS (medidos: LOW 1806×925 ~40KB,
 // MEDIUM 2500×1281 ~79KB, HIGH 2500×1281 ~142KB). HIGH y MEDIUM comparten
@@ -28,6 +35,7 @@ const QUALITY_TIERS = [
 const FRAME_COUNT = 36;
 const PROFILE_FRAME = 25; // frame 3/4 del set — igual que mock-data.ts
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const UPLOAD_CONCURRENCY = 8;
 
 export class ValidationError extends Error {
   name = "ValidationError";
@@ -49,13 +57,28 @@ export async function processColorZip(prisma, uploadJobId) {
       data: { status, progress, errorMessage: null, startedAt: job.startedAt ?? new Date() },
     });
 
-  const zipPath = publicUrlToPath(job.sourceUrl);
   const workDir = path.join(UPLOADS_ROOT, "tmp", `job-${uploadJobId}`);
   const srcDir = path.join(workDir, "src");
   const outDir = path.join(workDir, "out");
+  // Copia LOCAL del ZIP fuente para que unzipper (solo sabe leer de disco)
+  // pueda abrirlo. En modo disco ya está ahí (mismo volumen que la web). En
+  // modo S3 hay que bajarlo primero — se guarda FUERA de workDir a propósito:
+  // el safeRm(workDir) de más abajo limpia cualquier extracción a medias de
+  // un intento anterior, y esta copia debe sobrevivir a eso.
+  const zipPath = S3_MODE
+    ? path.join(UPLOADS_ROOT, "tmp", `job-${uploadJobId}-source.zip`)
+    : publicUrlToPath(job.sourceUrl);
 
   try {
     await setProgress("EXTRACTING", 2);
+
+    if (S3_MODE) {
+      const sourceKey = job.sourceUrl.slice("/uploads/".length);
+      const asset = await getObjectStream(sourceKey);
+      if (!asset) throw new Error(`El ZIP fuente ya no está disponible en el bucket (${sourceKey}).`);
+      await mkdir(path.dirname(zipPath), { recursive: true });
+      await pipeline(Readable.fromWeb(asset.stream), createWriteStream(zipPath));
+    }
 
     // — Abrir el ZIP (lee el directorio central; las entradas se streamean
     //   una a una a disco — el archivo nunca se carga entero en memoria §2.5).
@@ -146,20 +169,38 @@ export async function processColorZip(prisma, uploadJobId) {
       }
     }
 
-    // — Swap atómico (§2.3): el set nuevo se escribe completo fuera de la
-    //   ruta final y solo al terminar se conmuta. El showroom nunca ve un
-    //   set a medio escribir; si algo falla aquí, el set viejo sigue intacto.
+    // — Publicar el set nuevo. En disco: swap atómico con rename — el
+    //   showroom nunca ve un set a medio escribir. En S3 no hay rename
+    //   atómico entre prefijos, así que se sube el set completo bajo un
+    //   prefijo ÚNICO de este job y el límite atómico pasa a ser el commit
+    //   de Postgres de más abajo (nada lee sprites hasta que la fila lo
+    //   dice) — el prefijo anterior se limpia DESPUÉS de ese commit.
     await setProgress("COMPRESSING", 94);
-    const finalDir = path.join(UPLOADS_ROOT, "models", color.vehicle.slug, color.colorSlug);
-    const retiredDir = `${finalDir}.old-${uploadJobId}`;
-    await mkdir(path.dirname(finalDir), { recursive: true });
-    if (await exists(finalDir)) await rename(finalDir, retiredDir);
-    await rename(outDir, finalDir);
-    await safeRm(retiredDir);
+    let spriteBasePath;
+    const previousSpriteBasePath = color.spriteBasePath;
+    if (S3_MODE) {
+      const prefix = `models/${color.vehicle.slug}/${color.colorSlug}/${uploadJobId}`;
+      const files = [];
+      for (const tier of QUALITY_TIERS) {
+        const tierDir = path.join(outDir, tier.name);
+        for (const file of await readdir(tierDir)) {
+          files.push({ localPath: path.join(tierDir, file), key: `${prefix}/${tier.name}/${file}` });
+        }
+      }
+      await uploadInBatches(files, UPLOAD_CONCURRENCY);
+      spriteBasePath = `/uploads/${prefix}`;
+    } else {
+      const finalDir = path.join(UPLOADS_ROOT, "models", color.vehicle.slug, color.colorSlug);
+      const retiredDir = `${finalDir}.old-${uploadJobId}`;
+      await mkdir(path.dirname(finalDir), { recursive: true });
+      if (await exists(finalDir)) await rename(finalDir, retiredDir);
+      await rename(outDir, finalDir);
+      await safeRm(retiredDir);
+      spriteBasePath = `/uploads/models/${color.vehicle.slug}/${color.colorSlug}`;
+    }
 
     // — Registrar el resultado. profileImageUrl derivada del frame 25 LOW
     //   (plan §1.3) — la muestra siempre coincide con el color real.
-    const spriteBasePath = `/uploads/models/${color.vehicle.slug}/${color.colorSlug}`;
     await prisma.$transaction([
       prisma.vehicleColor.update({
         where: { id: color.id },
@@ -185,21 +226,73 @@ export async function processColorZip(prisma, uploadJobId) {
       }),
     ]);
 
+    // Best-effort: el prefijo S3 que estaba en vivo antes de este job ya no
+    // hace falta — nunca debe tumbar el job, lo nuevo ya se publicó.
+    if (S3_MODE && previousSpriteBasePath && previousSpriteBasePath !== spriteBasePath) {
+      await deleteObjectsByPrefix(previousSpriteBasePath).catch(() => {});
+    }
+
     // — Limpieza: ZIP original y temporales (§2.3 — un job terminado no deja
     //   huérfanos). El ZIP solo se borra en éxito: mientras haya error queda
     //   disponible para "Reintentar" sin volver a subir (§2.4).
     await safeRm(workDir);
-    await safeRm(zipPath);
+    if (S3_MODE) {
+      await deleteObject(job.sourceUrl).catch(() => {});
+      await safeRm(zipPath).catch(() => {});
+    } else {
+      await safeRm(zipPath);
+    }
   } catch (error) {
-    // Los temporales de trabajo se limpian siempre; el ZIP fuente se conserva
-    // para el reintento. La limpieza NUNCA debe enmascarar el error original
-    // (un EBUSY de Windows aquí ocultaba la causa real del fallo).
+    // Los temporales de trabajo se limpian siempre; el ZIP fuente (S3: la
+    // copia local descargada; disco: el original) se conserva para el
+    // reintento — la limpieza NUNCA debe enmascarar el error original (un
+    // EBUSY de Windows aquí ocultaba la causa real del fallo).
     await safeRm(workDir).catch(() => {});
+    if (S3_MODE) await safeRm(zipPath).catch(() => {});
     if (error instanceof ValidationError) {
       await prisma.vehicleColor.update({ where: { id: color.id }, data: { activeJobId: null } }).catch(() => {});
+      // Fallo permanente: lo que se haya alcanzado a subir bajo el prefijo
+      // propio de este job queda huérfano (la transacción que lo hace
+      // "vivo" nunca corrió) — limpieza best-effort.
+      if (S3_MODE) {
+        const prefix = `/uploads/models/${color.vehicle.slug}/${color.colorSlug}/${uploadJobId}`;
+        await deleteObjectsByPrefix(prefix).catch(() => {});
+      }
     }
     throw error;
   }
+}
+
+/** Limpieza best-effort del prefijo S3 propio de un job que terminó en
+ * fallo permanente por agotar reintentos (worker/index.mjs) — no aplica en
+ * modo disco (el scratch ya se limpia solo en cada re-intento). */
+export async function cleanupAbandonedJob(prisma, uploadJobId) {
+  if (!S3_MODE) return;
+  try {
+    const job = await prisma.uploadJob.findUnique({
+      where: { id: uploadJobId },
+      include: { vehicleColor: { include: { vehicle: true } } },
+    });
+    const color = job?.vehicleColor;
+    if (!color) return;
+    await deleteObjectsByPrefix(`/uploads/models/${color.vehicle.slug}/${color.colorSlug}/${uploadJobId}`);
+  } catch {
+    // best-effort — nunca debe interferir con el manejo de errores del job
+  }
+}
+
+/** Sube `files` ({ localPath, key }) con concurrencia acotada — 108 archivos
+ * chicos no ameritan multipart (eso es para el ZIP grande, no para esto). */
+async function uploadInBatches(files, concurrency) {
+  let next = 0;
+  async function worker() {
+    while (next < files.length) {
+      const i = next++;
+      const { localPath, key } = files[i];
+      await saveObject(key, await readFile(localPath));
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
 }
 
 function publicUrlToPath(publicUrl) {

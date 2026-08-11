@@ -4,9 +4,8 @@ import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/admin/audit";
 import { slugify } from "@/lib/admin/slug";
-import { uploadPathFor } from "@/lib/storage";
+import { uploadExists } from "@/lib/storage";
 import { getBoss, QUEUE_COLOR_ZIP } from "@/lib/queue";
-import { stat } from "node:fs/promises";
 
 const bodySchema = z.object({
   colorName: z.string().trim().min(1, "El color necesita un nombre").max(60),
@@ -40,9 +39,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   }
 
   // El ZIP debe existir de verdad en el storage temporal.
-  try {
-    await stat(uploadPathFor(key));
-  } catch {
+  if (!(await uploadExists(key))) {
     return NextResponse.json(
       { error: "La subida no se completó — vuelve a intentar con el archivo" },
       { status: 400 },

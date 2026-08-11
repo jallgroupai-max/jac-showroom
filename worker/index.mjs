@@ -8,7 +8,8 @@
 import { PgBoss } from "pg-boss";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { processColorZip } from "./process-color-zip.mjs";
+import { processColorZip, cleanupAbandonedJob } from "./process-color-zip.mjs";
+import { deleteObjectsByPrefix } from "../src/lib/storage-engine.mjs";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -84,6 +85,9 @@ await boss.work(QUEUE_COLOR_ZIP, { batchSize: 1 }, async ([job]) => {
           finishedAt: new Date(),
         },
       });
+      // Fallo permanente: lo que se haya alcanzado a subir al bucket bajo el
+      // prefijo propio de este job queda huérfano — limpieza best-effort.
+      await cleanupAbandonedJob(prisma, uploadJobId);
       console.error(`✘ job ${uploadJobId} agotó reintentos: ${error.message}`);
     }
   }
@@ -110,11 +114,8 @@ await boss.work(QUEUE_PURGE, { batchSize: 1 }, async () => {
   });
   for (const vehicle of expired) {
     await prisma.vehicle.delete({ where: { id: vehicle.id } });
-    const { rm } = await import("node:fs/promises");
-    const path = await import("node:path");
-    const root = path.join(process.cwd(), "uploads-data");
     for (const dir of [`models/${vehicle.slug}`, `interior/${vehicle.slug}`, `backgrounds/${vehicle.slug}`, `poi/${vehicle.slug}`]) {
-      await rm(path.join(root, dir), { recursive: true, force: true }).catch(() => {});
+      await deleteObjectsByPrefix(`/uploads/${dir}`).catch(() => {});
     }
     console.log(`🗑 purgado ${vehicle.slug} (archivado hace más de ${GRACE_DAYS} días)`);
   }

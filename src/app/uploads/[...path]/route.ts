@@ -1,15 +1,13 @@
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
 import path from "node:path";
-import { Readable } from "node:stream";
 import { NextResponse, type NextRequest } from "next/server";
-import { UPLOADS_ROOT } from "@/lib/storage";
+import { readUpload } from "@/lib/storage";
 
 // Sirve los assets subidos desde el panel (sprites, panorámicas, escenarios).
 // Viven FUERA de public/ porque Next no sirve archivos añadidos a public/
 // después del build (en dev sí — el 404 solo aparecía en producción).
 // Público sin auth: son los mismos assets que consume el showroom.
-// Con S3/R2 esta ruta desaparece — las URLs pasarán a apuntar al bucket/CDN.
+// Proxy dual-mode: lib/storage lee de disco local o del bucket S3 según
+// haya o no variables S3_* — esta ruta no sabe (ni le importa) cuál.
 
 const CONTENT_TYPES: Record<string, string> = {
   ".webp": "image/webp",
@@ -34,23 +32,16 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ path: 
   const contentType = CONTENT_TYPES[path.extname(key).toLowerCase()];
   if (!contentType) return NextResponse.json({ error: "No disponible" }, { status: 404 });
 
-  const filePath = path.join(UPLOADS_ROOT, key);
-  let info;
-  try {
-    info = await stat(filePath);
-  } catch {
-    return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-  }
-  if (!info.isFile()) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+  const asset = await readUpload(key);
+  if (!asset) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
   // Mismo criterio de caché que /assets en next.config.ts: reuso inmediato
   // en la sesión, refresco en segundo plano tras un reemplazo.
-  const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
-  return new Response(stream, {
-    headers: {
-      "Content-Type": contentType,
-      "Content-Length": String(info.size),
-      "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
-    },
-  });
+  const headers: HeadersInit = {
+    "Content-Type": contentType,
+    "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+  };
+  if (asset.contentLength !== null) headers["Content-Length"] = String(asset.contentLength);
+
+  return new Response(asset.stream, { headers });
 }
