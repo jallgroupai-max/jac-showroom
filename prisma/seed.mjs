@@ -89,6 +89,15 @@ const HOTSPOT_ICONS = [
   { key: "gasoil-car", label: "Gasoil", group: "GENERAL", assetName: "gasoil-car", svgPath: "M7 20V5.5a1.5 1.5 0 011.5-1.5h5A1.5 1.5 0 0115 5.5V20M5 20h12M9.5 7.5h3.5" },
   { key: "electric-car", label: "Eléctrico", group: "GENERAL", assetName: "electric-car", svgPath: "M13 3L5 13.5h5L9.5 21l8-10.5h-5z" },
   { key: "4x4-car", label: "4×4", group: "GENERAL", assetName: "4x4-car", svgPath: "M2 16h20M4 16v-4h5l2-3h4l2 3h3v4M7.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3M16.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3" },
+  { key: "outside_360_icon", label: "Vista 360°", group: "EXTERIOR", assetName: "outside_360_icon", svgPath: "M12 3.5a8.5 8.5 0 100 17 8.5 8.5 0 000-17zM12 3.5v3M20.5 12h-3M12 20.5v-3M3.5 12h3" },
+  { key: "outside_back_lights", label: "Luces traseras", group: "EXTERIOR", assetName: "outside_back_lights", svgPath: "M20 8h-5a4 4 0 000 8h5zM10 9.5H5M10 12.5H4M10 15.5H5" },
+  { key: "outside_quemacoco", label: "Quemacocos", group: "EXTERIOR", assetName: "outside_quemacoco", svgPath: "M4 7.5h16v9H4zM7 10h10v4H7z" },
+  { key: "outside_suspension", label: "Suspensión", group: "EXTERIOR", assetName: "outside_suspension", svgPath: "M12 3v2L9 7l6 2-6 2 6 2-6 2 3 2v3" },
+  { key: "outside_transmition", label: "Transmisión", group: "EXTERIOR", assetName: "outside_transmition", svgPath: "M3 12h4l2-3h6l2 3h4M9 9v6M15 9v6" },
+  { key: "outside_wifi", label: "Conectividad", group: "EXTERIOR", assetName: "outside_wifi", svgPath: "M4 10a11 11 0 0116 0M7 13.5a6.5 6.5 0 0110 0M10.5 17a2 2 0 013 0M12 20h.01" },
+  { key: "inside_asientos_temperatura", label: "Asientos climatizados", group: "INTERIOR", assetName: "inside_asientos_temperatura", svgPath: "M6 20v-5a3 3 0 013-3h6a3 3 0 013 3v5M6 20h12M9 4c1 1 1 2 0 3M12 4c1 1 1 2 0 3M15 4c1 1 1 2 0 3" },
+  { key: "inside_lights", label: "Luz interior", group: "INTERIOR", assetName: "inside_lights", svgPath: "M8 4h8l-1 4H9zM6 8h12v2H6zM9 13l1.5 3M15 13l-1.5 3M12 13v3" },
+  { key: "inside_wireless", label: "Carga inalámbrica", group: "INTERIOR", assetName: "inside_wireless", svgPath: "M7 20h10a1 1 0 001-1v-1a1 1 0 00-1-1H7a1 1 0 00-1 1v1a1 1 0 001 1zM9 8a3 3 0 016 0M9 11a6 6 0 016 0" },
 ];
 
 main()

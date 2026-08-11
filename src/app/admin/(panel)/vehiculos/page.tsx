@@ -131,11 +131,16 @@ export default async function VehiculosPage({
           {vehicles.map((v) => (
             <div key={v.id} className="flex flex-col overflow-hidden rounded-[18px] border border-[var(--adm-line)] bg-white">
               <div className="relative flex aspect-[4/3] items-center justify-center border-b border-[var(--adm-line)] bg-[var(--adm-surface)] text-[#a8a8a8]">
-                <CatalogIcon
-                  d={CATEGORY_ICON_PATHS[v.category.slug] ?? FALLBACK_CATEGORY_PATH}
-                  size={30}
-                  strokeWidth={1.2}
-                />
+                {v.cardImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={v.cardImageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <CatalogIcon
+                    d={CATEGORY_ICON_PATHS[v.category.slug] ?? FALLBACK_CATEGORY_PATH}
+                    size={30}
+                    strokeWidth={1.2}
+                  />
+                )}
                 <span
                   className={`absolute left-3 top-3 rounded-full px-[11px] py-[5px] text-[11px] font-bold tracking-[0.06em] ${
                     v.status === "PUBLISHED"

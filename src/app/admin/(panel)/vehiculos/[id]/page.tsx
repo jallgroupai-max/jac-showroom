@@ -78,10 +78,8 @@ export default async function EditarVehiculoPage({
           vehicleId={vehicle.id}
           defaults={{
             warrantyLabel: vehicle.warrantyLabel,
-            groups: vehicle.specGroups.map((g) => ({
-              title: g.title,
-              items: g.items.map((i) => ({ label: i.label, value: i.value })),
-            })),
+            title: vehicle.specGroups[0]?.title ?? "",
+            motor: vehicle.specGroups[0]?.items[0]?.value ?? "",
           }}
         />
       ) : (
@@ -135,7 +133,7 @@ async function Step4FeaturesLoader({ vehicle }: { vehicle: LoadedVehicle }) {
           imageUrl: p.imageUrl,
           frame: p.frame ?? 1,
         }))}
-      icons={icons.filter((i) => i.group !== "INTERIOR")}
+      icons={icons.filter((i) => i.group === "EXTERIOR")}
       framePreviewBase={readyColor?.spriteBasePath ? `${readyColor.spriteBasePath}/low` : null}
     />
   );
@@ -157,7 +155,7 @@ async function Step5InteriorLoader({ vehicle }: { vehicle: LoadedVehicle }) {
           textureY: p.textureY,
           blink: p.blink,
         }))}
-      icons={icons.filter((i) => i.group !== "EXTERIOR")}
+      icons={icons.filter((i) => i.group === "INTERIOR")}
     />
   );
 }
@@ -171,8 +169,9 @@ async function Step1FormLoader({
   return (
     <Step1Form
       categories={categories}
-      icons={icons}
+      generalIcons={icons.filter((i) => i.group === "GENERAL")}
       vehicleId={vehicle.id}
+      cardImageUrl={vehicle.cardImageUrl}
       defaults={{
         commercialName: vehicle.commercialName,
         technicalName: vehicle.technicalName,

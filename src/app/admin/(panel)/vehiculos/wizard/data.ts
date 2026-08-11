@@ -25,6 +25,7 @@ export async function getWizardFormData() {
       label: i.label,
       group: i.group as string,
       svgPath: i.svgPath,
+      assetName: i.assetName,
     })),
   };
 }

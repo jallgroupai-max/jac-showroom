@@ -1,33 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { vehicleBasicsSchema, type VehicleBasicsInput } from "@/lib/admin/schemas";
 import { slugify } from "@/lib/admin/slug";
-import { createVehicle, updateVehicleBasics } from "../actions";
-import { CatalogIcon, CATEGORY_ICON_PATHS, FALLBACK_CATEGORY_PATH } from "./catalog-icon";
+import { createVehicle, updateVehicleBasics, saveVehicleCardImage, removeVehicleCardImage } from "../actions";
+import { CatalogIcon, CATEGORY_ICON_PATHS, FALLBACK_CATEGORY_PATH, HotspotIconImage } from "./catalog-icon";
 
 type CategoryOption = { id: string; slug: string; name: string; vehicleCount: number };
-type IconOption = { id: string; key: string; label: string; group: string; svgPath: string };
-
-const GROUP_LABELS: Record<string, string> = {
-  EXTERIOR: "Exterior",
-  INTERIOR: "Interior",
-  GENERAL: "General",
-};
+type GeneralIconOption = { id: string; key: string; label: string; svgPath: string; assetName: string | null };
 
 export function Step1Form({
   categories,
-  icons,
+  generalIcons,
   vehicleId,
+  cardImageUrl,
   defaults,
 }: {
   categories: CategoryOption[];
-  icons: IconOption[];
+  /** Solo grupo GENERAL (combustible/tracción) — los chips del carrusel
+   * público "selecciona tu vehículo", nunca íconos de exterior/interior. */
+  generalIcons: GeneralIconOption[];
   /** null = modo creación (/nuevo). */
   vehicleId: string | null;
+  /** Foto de perfil vigente — null hasta subir una (solo edición). */
+  cardImageUrl?: string | null;
   defaults?: Partial<VehicleBasicsInput>;
 }) {
   const router = useRouter();
@@ -66,6 +65,11 @@ export function Step1Form({
   const trimLabel = useWatch({ control, name: "trimLabel" });
   const activeCategory = categories.find((c) => c.id === categoryId);
 
+  function toggleIcon(id: string) {
+    const next = iconIds.includes(id) ? iconIds.filter((i) => i !== id) : [...iconIds, id];
+    setValue("iconIds", next, { shouldDirty: true });
+  }
+
   function syncSlug(commercial: string, trim: string) {
     if (!slugTouched) {
       setValue("slug", slugify(commercial, trim), { shouldValidate: false });
@@ -76,11 +80,6 @@ export function Step1Form({
     if (!typeTagTouched && categoryName && trim) {
       setValue("typeTag", `${categoryName} · ${trim}`, { shouldValidate: false });
     }
-  }
-
-  function toggleIcon(id: string) {
-    const next = iconIds.includes(id) ? iconIds.filter((i) => i !== id) : [...iconIds, id];
-    setValue("iconIds", next, { shouldDirty: true });
   }
 
   const onSubmit = handleSubmit(async (values) => {
@@ -233,13 +232,29 @@ export function Step1Form({
 
       <div className="flex flex-col gap-3.5">
         <div className="flex items-baseline gap-3">
-          <span className="text-sm font-bold">Características e íconos</span>
+          <span className="text-sm font-bold">Foto de perfil</span>
           <span className="text-[12.5px] text-[var(--adm-fainter)]">
-            Se muestran en la card del catálogo · {iconIds.length} activos
+            Se muestra en el carrusel del showroom y como miniatura en la biblioteca de vehículos
+          </span>
+        </div>
+        {vehicleId ? (
+          <CardImageUploader vehicleId={vehicleId} url={cardImageUrl ?? null} />
+        ) : (
+          <p className="text-[12.5px] text-[var(--adm-faint)]">
+            Podrás cargar la foto de perfil después de crear el vehículo.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3.5">
+        <div className="flex items-baseline gap-3">
+          <span className="text-sm font-bold">Combustible y tracción</span>
+          <span className="text-[12.5px] text-[var(--adm-fainter)]">
+            Chips del carrusel «selecciona tu vehículo» — solo se muestran los 2 primeros
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-          {icons.map((icon) => {
+          {generalIcons.map((icon) => {
             const isOn = iconIds.includes(icon.id);
             return (
               <button
@@ -251,18 +266,13 @@ export function Step1Form({
                 }`}
               >
                 <span
-                  className={`flex h-10 w-10 flex-none items-center justify-center rounded-full ${
-                    isOn ? "bg-black text-white" : "bg-[var(--adm-surface)] text-black"
+                  className={`flex h-10 w-10 flex-none items-center justify-center rounded-full p-1.5 ${
+                    isOn ? "bg-black" : "bg-[var(--adm-surface)]"
                   }`}
                 >
-                  <CatalogIcon d={icon.svgPath} />
+                  <HotspotIconImage icon={icon} size={26} />
                 </span>
-                <span className="flex flex-col gap-0.5 text-left">
-                  <span className="text-[13px] font-semibold">{icon.label}</span>
-                  <span className="text-[11px] uppercase tracking-[0.06em] text-[var(--adm-faint)]">
-                    {GROUP_LABELS[icon.group] ?? icon.group}
-                  </span>
-                </span>
+                <span className="text-[13px] font-semibold">{icon.label}</span>
                 <span
                   className={`ml-auto h-[9px] w-[9px] flex-none rounded-full border ${
                     isOn ? "border-black bg-black" : "border-[#c9c9c9] bg-white"
@@ -295,5 +305,80 @@ export function Step1Form({
         </button>
       </div>
     </form>
+  );
+}
+
+function CardImageUploader({ vehicleId, url }: { vehicleId: string; url: string | null }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function upload(file: File) {
+    setError(null);
+    const formData = new FormData();
+    formData.set("file", file);
+    startTransition(async () => {
+      const result = await saveVehicleCardImage(vehicleId, formData);
+      if (!result.ok) setError(result.error);
+      else router.refresh();
+    });
+  }
+
+  function remove() {
+    startTransition(async () => {
+      await removeVehicleCardImage(vehicleId);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {url ? (
+        <div className="relative h-[140px] w-[210px] overflow-hidden rounded-[12px] border border-[var(--adm-line)] bg-[var(--adm-surface)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="Foto de perfil" className="h-full w-full object-cover" />
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={remove}
+            className="absolute right-2 top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-white/50 bg-black/60 text-white hover:bg-black"
+            aria-label="Quitar foto de perfil"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
+
+      <label
+        className={`flex w-[210px] cursor-pointer items-center justify-center gap-2.5 rounded-[12px] border-[1.5px] border-dashed border-[#cfcfcf] bg-[var(--adm-surface-soft)] px-4 hover:border-black hover:bg-white ${
+          url ? "h-11" : "h-[110px] flex-col"
+        }`}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="1.4" strokeLinecap="round">
+          <path d="M12 16V4m0 0L7 9m5-5 5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+        </svg>
+        <span className="text-[13px] font-semibold">
+          {isPending ? "Subiendo…" : url ? "Reemplazar" : "Cargar foto de perfil"}
+        </span>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          disabled={isPending}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) upload(file);
+            e.target.value = "";
+          }}
+        />
+      </label>
+      {error ? (
+        <p role="alert" className="text-xs font-semibold text-[#b42318]">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

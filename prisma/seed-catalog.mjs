@@ -27,6 +27,15 @@ const MOCK_ICONS = [
   { key: "inside_transmition", label: "Transmisión", group: "INTERIOR", svgPath: "M7 5v14M17 5v14M7 12h10M7 5a1.5 1.5 0 100-3M17 5a1.5 1.5 0 100-3" },
   { key: "inside_asientos", label: "Asientos", group: "INTERIOR", svgPath: "M7 4v9l2 2h7M7 13h8v6M7 19h9" },
   { key: "additional_info", label: "Información", group: "INTERIOR", svgPath: "M12 3a9 9 0 100 18 9 9 0 000-18M12 8v.5M12 11v6" },
+  { key: "outside_360_icon", label: "Vista 360°", group: "EXTERIOR", svgPath: "M12 3.5a8.5 8.5 0 100 17 8.5 8.5 0 000-17zM12 3.5v3M20.5 12h-3M12 20.5v-3M3.5 12h3" },
+  { key: "outside_back_lights", label: "Luces traseras", group: "EXTERIOR", svgPath: "M20 8h-5a4 4 0 000 8h5zM10 9.5H5M10 12.5H4M10 15.5H5" },
+  { key: "outside_quemacoco", label: "Quemacocos", group: "EXTERIOR", svgPath: "M4 7.5h16v9H4zM7 10h10v4H7z" },
+  { key: "outside_suspension", label: "Suspensión", group: "EXTERIOR", svgPath: "M12 3v2L9 7l6 2-6 2 6 2-6 2 3 2v3" },
+  { key: "outside_transmition", label: "Transmisión", group: "EXTERIOR", svgPath: "M3 12h4l2-3h6l2 3h4M9 9v6M15 9v6" },
+  { key: "outside_wifi", label: "Conectividad", group: "EXTERIOR", svgPath: "M4 10a11 11 0 0116 0M7 13.5a6.5 6.5 0 0110 0M10.5 17a2 2 0 013 0M12 20h.01" },
+  { key: "inside_asientos_temperatura", label: "Asientos climatizados", group: "INTERIOR", svgPath: "M6 20v-5a3 3 0 013-3h6a3 3 0 013 3v5M6 20h12M9 4c1 1 1 2 0 3M12 4c1 1 1 2 0 3M15 4c1 1 1 2 0 3" },
+  { key: "inside_lights", label: "Luz interior", group: "INTERIOR", svgPath: "M8 4h8l-1 4H9zM6 8h12v2H6zM9 13l1.5 3M15 13l-1.5 3M12 13v3" },
+  { key: "inside_wireless", label: "Carga inalámbrica", group: "INTERIOR", svgPath: "M7 20h10a1 1 0 001-1v-1a1 1 0 00-1-1H7a1 1 0 00-1 1v1a1 1 0 001 1zM9 8a3 3 0 016 0M9 11a6 6 0 016 0" },
 ];
 
 // ——— Puntos de interés genéricos del mock (mismos textos/frames/posiciones;

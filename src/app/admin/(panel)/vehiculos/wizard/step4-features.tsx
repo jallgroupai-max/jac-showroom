@@ -3,14 +3,20 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveExteriorPoi, deletePoi } from "../poi-actions";
-import { CatalogIcon } from "./catalog-icon";
+import { HotspotIconImage } from "./catalog-icon";
 
 // Paso 4 — Destacados del exterior (prototipo "Destacados" + artefacto Req 5),
 // MÁS el campo que el prototipo no tenía: el fotograma (1–36) al que rota el
 // vehículo al abrir el punto — con vista previa REAL sobre el sprite LOW ya
 // procesado (§0.2: por esto el paso 3 va antes).
 
-export type FeatureIconOption = { id: string; key: string; label: string; svgPath: string };
+export type FeatureIconOption = {
+  id: string;
+  key: string;
+  label: string;
+  svgPath: string;
+  assetName: string | null;
+};
 
 export type ExteriorPoi = {
   id: string;
@@ -199,13 +205,13 @@ function FeatureCard({
               type="button"
               onClick={() => setIconId(icon.id)}
               title={icon.label}
-              className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border ${
+              className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border p-1.5 ${
                 icon.id === iconId
-                  ? "border-black bg-black text-white"
-                  : "border-[var(--adm-line)] bg-white text-black hover:border-black"
+                  ? "border-black bg-black"
+                  : "border-[var(--adm-line)] bg-white hover:border-black"
               }`}
             >
-              <CatalogIcon d={icon.svgPath} size={17} />
+              <HotspotIconImage icon={icon} size={20} />
             </button>
           ))}
         </div>

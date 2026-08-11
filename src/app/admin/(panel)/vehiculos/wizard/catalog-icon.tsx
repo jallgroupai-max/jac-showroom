@@ -1,3 +1,26 @@
+// Ícono real de /assets/icons — el mismo archivo que sirve el showroom
+// público (HotspotIcon.assetName). Sin assetName, cae al path 24×24
+// abstracto (íconos creados desde el panel sin SVG de diseño todavía).
+export function HotspotIconImage({
+  icon,
+  size = 28,
+}: {
+  icon: { label: string; svgPath: string; assetName?: string | null };
+  size?: number;
+}) {
+  if (!icon.assetName) return <CatalogIcon d={icon.svgPath} size={size * 0.75} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/assets/icons/${icon.assetName}.svg`}
+      alt=""
+      width={size}
+      height={size}
+      className="h-full w-full object-contain"
+    />
+  );
+}
+
 // Renderiza un ícono del catálogo HotspotIcon (path 24×24, stroke — mismo
 // formato que el prototipo).
 export function CatalogIcon({

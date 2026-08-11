@@ -9,7 +9,11 @@ export default async function NuevoVehiculoPage() {
 
   return (
     <WizardShell vehicleId={null} activeStep={1} counts={null}>
-      <Step1Form categories={categories} icons={icons} vehicleId={null} />
+      <Step1Form
+        categories={categories}
+        generalIcons={icons.filter((i) => i.group === "GENERAL")}
+        vehicleId={null}
+      />
     </WizardShell>
   );
 }

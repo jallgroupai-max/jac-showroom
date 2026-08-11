@@ -7,7 +7,7 @@ import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import "@photo-sphere-viewer/core/index.css";
 import "@photo-sphere-viewer/markers-plugin/index.css";
 import { saveInteriorPoi, deletePoi } from "../poi-actions";
-import { CatalogIcon } from "./catalog-icon";
+import { HotspotIconImage } from "./catalog-icon";
 
 // Paso 5 — Imagen 360° del interior y puntos de interés (Req 6/7).
 //
@@ -28,7 +28,13 @@ export type InteriorPoi = {
   blink: "SOFT" | "FAST" | "NONE";
 };
 
-export type InteriorIconOption = { id: string; key: string; label: string; svgPath: string };
+export type InteriorIconOption = {
+  id: string;
+  key: string;
+  label: string;
+  svgPath: string;
+  assetName: string | null;
+};
 
 const BLINK_LABELS: Record<InteriorPoi["blink"], string> = {
   SOFT: "Suave",
@@ -464,13 +470,13 @@ function PoiRow({
             disabled={busy}
             title={icon.label}
             onClick={() => save({ iconId: icon.id })}
-            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border ${
+            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border p-1.5 ${
               icon.id === poi.iconId
-                ? "border-black bg-black text-white"
-                : "border-[var(--adm-line)] bg-white text-black hover:border-black"
+                ? "border-black bg-black"
+                : "border-[var(--adm-line)] bg-white hover:border-black"
             }`}
           >
-            <CatalogIcon d={icon.svgPath} size={15} />
+            <HotspotIconImage icon={icon} size={18} />
           </button>
         ))}
       </div>

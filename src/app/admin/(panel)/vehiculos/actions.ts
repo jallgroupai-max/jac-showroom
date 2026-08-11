@@ -122,6 +122,73 @@ export async function updateVehicleBasics(
 }
 
 // ————————————————————————————————————————————————————————————————
+// Paso 1 — foto de perfil del vehículo: la imagen del carrusel "selecciona
+// tu vehículo" del showroom público, y la miniatura de la biblioteca de
+// vehículos del admin (Vehicle.cardImageUrl). Requiere un vehículo ya
+// creado — igual que el fondo propio del paso 6.
+// ————————————————————————————————————————————————————————————————
+
+export async function saveVehicleCardImage(vehicleId: string, formData: FormData): Promise<ActionResult> {
+  const user = await requireAdminUser();
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+  if (!vehicle || vehicle.status === "ARCHIVED") return { ok: false, error: "El vehículo no existe." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Selecciona una imagen (JPG, PNG o WebP)." };
+  }
+
+  let normalized: Buffer;
+  try {
+    normalized = await sharp(Buffer.from(await file.arrayBuffer()))
+      .resize({ width: 1600, withoutEnlargement: true })
+      .webp({ quality: 85 })
+      .toBuffer();
+  } catch {
+    return { ok: false, error: "El archivo no es una imagen válida." };
+  }
+
+  const previous = vehicle.cardImageUrl;
+  const url = await saveUpload(`card/${vehicle.slug}/${crypto.randomUUID()}.webp`, normalized);
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({ where: { id: vehicleId }, data: { cardImageUrl: url } });
+    await writeAudit(tx, {
+      userId: user.id,
+      action: "upload-card-image",
+      entityType: "Vehicle",
+      entityId: vehicleId,
+      detail: { bytes: file.size },
+    });
+  });
+  if (previous) await deleteUpload(previous);
+
+  revalidatePath("/admin/vehiculos");
+  revalidatePath(`/admin/vehiculos/${vehicleId}`);
+  return { ok: true };
+}
+
+export async function removeVehicleCardImage(vehicleId: string): Promise<ActionResult> {
+  const user = await requireAdminUser();
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+  if (!vehicle) return { ok: false, error: "El vehículo no existe." };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({ where: { id: vehicleId }, data: { cardImageUrl: null } });
+    await writeAudit(tx, {
+      userId: user.id,
+      action: "remove-card-image",
+      entityType: "Vehicle",
+      entityId: vehicleId,
+    });
+  });
+  if (vehicle.cardImageUrl) await deleteUpload(vehicle.cardImageUrl);
+
+  revalidatePath("/admin/vehiculos");
+  revalidatePath(`/admin/vehiculos/${vehicleId}`);
+  return { ok: true };
+}
+
+// ————————————————————————————————————————————————————————————————
 // Paso 2 — ficha técnica (SpecGroup/SpecItem + garantía)
 // ————————————————————————————————————————————————————————————————
 
@@ -147,17 +214,15 @@ export async function saveVehicleSpecs(
       data: {
         warrantyLabel: parsed.data.warrantyLabel,
         specGroups: {
-          create: parsed.data.groups.map((group, gOrder) => ({
-            title: group.title,
-            order: gOrder,
-            items: {
-              create: group.items.map((item, iOrder) => ({
-                label: item.label,
-                value: item.value,
-                order: iOrder,
-              })),
+          create: [
+            {
+              title: parsed.data.title,
+              order: 0,
+              items: {
+                create: [{ label: "Motor", value: parsed.data.motor, order: 0 }],
+              },
             },
-          })),
+          ],
         },
       },
     });
@@ -166,7 +231,7 @@ export async function saveVehicleSpecs(
       action: "update-specs",
       entityType: "Vehicle",
       entityId: vehicleId,
-      detail: { groups: parsed.data.groups.length },
+      detail: { title: parsed.data.title },
     });
   });
 

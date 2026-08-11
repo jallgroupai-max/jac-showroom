@@ -18,6 +18,8 @@ export const vehicleBasicsSchema = z.object({
   // Texto de la card del catálogo — se autollena `${categoría} · ${versión}`
   // pero es editable: los datos validados pixel-a-pixel lo exigen (§1.9).
   typeTag: z.string().trim().min(1, "La etiqueta de la card es obligatoria").max(60),
+  // Íconos de combustible/tracción (HotspotIcon group GENERAL) — los chips
+  // que muestra el carrusel "selecciona tu vehículo" del showroom público.
   // Sin .default(): react-hook-form + zodResolver exigen que el tipo de
   // entrada y el de salida coincidan; los defaults los pone defaultValues.
   iconIds: z.array(z.string()),
@@ -27,19 +29,8 @@ export type VehicleBasicsInput = z.infer<typeof vehicleBasicsSchema>;
 
 export const vehicleSpecsSchema = z.object({
   warrantyLabel: z.string().trim().max(120),
-  groups: z.array(
-    z.object({
-      title: z.string().trim().min(1, "El grupo necesita un título").max(60),
-      items: z
-        .array(
-          z.object({
-            label: z.string().trim().min(1, "Falta la etiqueta").max(80),
-            value: z.string().trim().min(1, "Falta el valor").max(120),
-          }),
-        )
-        .min(1, "El grupo necesita al menos una fila"),
-    }),
-  ),
+  title: z.string().trim().min(1, "El título es obligatorio").max(60),
+  motor: z.string().trim().min(1, "El motor es obligatorio").max(120),
 });
 
 export type VehicleSpecsInput = z.infer<typeof vehicleSpecsSchema>;
