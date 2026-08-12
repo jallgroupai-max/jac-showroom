@@ -27,10 +27,18 @@ export const vehicleBasicsSchema = z.object({
 
 export type VehicleBasicsInput = z.infer<typeof vehicleBasicsSchema>;
 
+export const specItemSchema = z.object({
+  label: z.string().trim().min(1, "La etiqueta es obligatoria").max(60),
+  value: z.string().trim().min(1, "El valor es obligatorio").max(120),
+});
+
 export const vehicleSpecsSchema = z.object({
   warrantyLabel: z.string().trim().max(120),
   title: z.string().trim().min(1, "El título es obligatorio").max(60),
-  motor: z.string().trim().min(1, "El motor es obligatorio").max(120),
+  // Lista libre de fila título+valor — el admin puede seguir agregando
+  // filas con "+" (ej. Potencia, Torque, Cilindrada...).
+  items: z.array(specItemSchema).min(1, "Agrega al menos una fila a la ficha técnica"),
 });
 
+export type SpecItemInput = z.infer<typeof specItemSchema>;
 export type VehicleSpecsInput = z.infer<typeof vehicleSpecsSchema>;

@@ -92,7 +92,10 @@ export function InteriorPanorama({ imageUrl, points, activeId, onSelectPoint }: 
                 id: poi.id,
                 position: { textureX: poi.panoramaPosition!.textureX, textureY: poi.panoramaPosition!.textureY },
                 html: markerHtml(iconAssetUrl(poi.icon), poi.blink ?? "soft"),
-                size: { width: 44, height: 44 },
+                size: {
+                  width: Math.round(44 * ((poi.iconSize ?? 100) / 100)),
+                  height: Math.round(44 * ((poi.iconSize ?? 100) / 100)),
+                },
                 anchor: "center center",
                 tooltip: poi.title,
                 className: poi.id === activeId ? MARKER_ACTIVE_CLASS : undefined,

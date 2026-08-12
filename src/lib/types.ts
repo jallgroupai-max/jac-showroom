@@ -71,6 +71,12 @@ export interface PointOfInterest {
    * detalle que aparece junto al vehículo. Sin esto, el panel muestra solo
    * título y descripción. */
   image?: string;
+  /** Recorte 16:9 (mobile) del mismo punto — solo exterior. Sin esto, cae a
+   * `image` (el recorte 9:16 desktop) en cualquier viewport. */
+  imageMobile?: string;
+  /** Tamaño del marcador, % relativo al tamaño base de cada renderer (100 =
+   * normal). Ausente = 100. */
+  iconSize?: number;
   /** Ritmo del anillo del marker de interior — configurable desde el panel
    * de administración. Ausente = "soft" (el comportamiento de siempre). */
   blink?: "soft" | "fast" | "none";

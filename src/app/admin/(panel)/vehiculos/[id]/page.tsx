@@ -79,7 +79,8 @@ export default async function EditarVehiculoPage({
           defaults={{
             warrantyLabel: vehicle.warrantyLabel,
             title: vehicle.specGroups[0]?.title ?? "",
-            motor: vehicle.specGroups[0]?.items[0]?.value ?? "",
+            items:
+              vehicle.specGroups[0]?.items.map((i) => ({ label: i.label, value: i.value })) ?? [],
           }}
         />
       ) : (
@@ -131,7 +132,9 @@ async function Step4FeaturesLoader({ vehicle }: { vehicle: LoadedVehicle }) {
           title: p.title,
           description: p.description,
           imageUrl: p.imageUrl,
+          imageMobileUrl: p.imageMobileUrl,
           frame: p.frame ?? 1,
+          iconSize: p.iconSize,
         }))}
       icons={icons.filter((i) => i.group === "EXTERIOR")}
       framePreviewBase={readyColor?.spriteBasePath ? `${readyColor.spriteBasePath}/low` : null}
@@ -151,6 +154,9 @@ async function Step5InteriorLoader({ vehicle }: { vehicle: LoadedVehicle }) {
           id: p.id,
           iconId: p.iconId,
           title: p.title,
+          description: p.description,
+          imageUrl: p.imageUrl,
+          iconSize: p.iconSize,
           textureX: p.textureX,
           textureY: p.textureY,
           blink: p.blink,

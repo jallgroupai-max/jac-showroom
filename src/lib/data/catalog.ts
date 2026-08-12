@@ -115,6 +115,8 @@ function toVehicleDTO(v: VehicleRow): VehicleDTO {
     order: p.order,
     frame: p.frame ?? undefined,
     image: p.imageUrl ?? undefined,
+    imageMobile: p.imageMobileUrl ?? undefined,
+    iconSize: p.iconSize,
     blink: p.blink === "SOFT" ? "soft" : p.blink === "FAST" ? "fast" : "none",
     // 0–1 almacenado (§1.5) → píxeles de textura, que es lo que espera el
     // visor (interior-panorama.tsx / Photo Sphere Viewer).

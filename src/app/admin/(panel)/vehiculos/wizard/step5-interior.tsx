@@ -23,6 +23,9 @@ export type InteriorPoi = {
   id: string;
   iconId: string;
   title: string;
+  description: string;
+  imageUrl: string | null;
+  iconSize: number;
   textureX: number | null;
   textureY: number | null;
   blink: "SOFT" | "FAST" | "NONE";
@@ -172,9 +175,10 @@ function PanoramaUploader({ vehicleId, panoramaUrl }: { vehicleId: string; panor
 // Editor sobre la panorámica.
 // ————————————————————————————————————————————————————————————————
 
-function editorMarkerHtml(title: string, selected: boolean): string {
+function editorMarkerHtml(title: string, selected: boolean, iconSize: number): string {
+  const dot = Math.round(20 * (iconSize / 100));
   return `<div style="display:flex;align-items:center;gap:8px;pointer-events:none">
-    <span style="width:20px;height:20px;border-radius:9999px;background:#fff;border:2px solid #000;flex:none"></span>
+    <span style="width:${dot}px;height:${dot}px;border-radius:9999px;background:#fff;border:2px solid #000;flex:none"></span>
     <span style="font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:9999px;white-space:nowrap;background:${selected ? "#000" : "#fff"};color:${selected ? "#fff" : "#000"};border:1px solid #000">${escapeHtml(title)}</span>
   </div>`;
 }
@@ -268,14 +272,16 @@ function PanoramaPoiEditor({
         setError(null);
         startTransition(async () => {
           const base = moving ? current.find((p) => p.id === moving) : null;
-          const result = await saveInteriorPoi(vehicleId, {
-            id: base?.id,
-            iconId: base?.iconId ?? icons[0]?.id ?? "",
-            title: base?.title ?? `Punto ${current.length + 1}`,
-            textureX,
-            textureY,
-            blink: base?.blink ?? "SOFT",
-          });
+          const fd = new FormData();
+          if (base?.id) fd.set("id", base.id);
+          fd.set("iconId", base?.iconId ?? icons[0]?.id ?? "");
+          fd.set("title", base?.title ?? `Punto ${current.length + 1}`);
+          fd.set("description", base?.description ?? "");
+          fd.set("textureX", String(textureX));
+          fd.set("textureY", String(textureY));
+          fd.set("blink", base?.blink ?? "SOFT");
+          fd.set("iconSize", String(base?.iconSize ?? 100));
+          const result = await saveInteriorPoi(vehicleId, fd);
           if (!result.ok) setError(result.error);
           else {
             setRelocatingId(null);
@@ -378,8 +384,8 @@ function syncMarkers(
             textureX: Math.round((poi.textureX as number) * size.width),
             textureY: Math.round((poi.textureY as number) * size.height),
           },
-          html: editorMarkerHtml(poi.title, poi.id === selectedId),
-          size: { width: 220, height: 30 },
+          html: editorMarkerHtml(poi.title, poi.id === selectedId, poi.iconSize),
+          size: { width: Math.round(220 * (poi.iconSize / 100)), height: Math.round(30 * (poi.iconSize / 100)) },
           anchor: "center left",
         })),
     );
@@ -410,17 +416,26 @@ function PoiRow({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [iconSize, setIconSize] = useState(poi.iconSize);
+  const [imagePreview, setImagePreview] = useState<string | null>(poi.imageUrl);
 
-  function save(patch: Partial<Pick<InteriorPoi, "title" | "iconId" | "blink">>) {
+  function save(
+    patch: Partial<Pick<InteriorPoi, "title" | "iconId" | "blink" | "description" | "iconSize">> & {
+      image?: File;
+    },
+  ) {
     startTransition(async () => {
-      await saveInteriorPoi(vehicleId, {
-        id: poi.id,
-        iconId: patch.iconId ?? poi.iconId,
-        title: patch.title ?? poi.title,
-        textureX: poi.textureX ?? 0.5,
-        textureY: poi.textureY ?? 0.5,
-        blink: patch.blink ?? poi.blink,
-      });
+      const fd = new FormData();
+      fd.set("id", poi.id);
+      fd.set("iconId", patch.iconId ?? poi.iconId);
+      fd.set("title", patch.title ?? poi.title);
+      fd.set("description", patch.description ?? poi.description);
+      fd.set("textureX", String(poi.textureX ?? 0.5));
+      fd.set("textureY", String(poi.textureY ?? 0.5));
+      fd.set("blink", patch.blink ?? poi.blink);
+      fd.set("iconSize", String(patch.iconSize ?? iconSize));
+      if (patch.image) fd.set("image", patch.image);
+      await saveInteriorPoi(vehicleId, fd);
       router.refresh();
     });
   }
@@ -442,6 +457,32 @@ function PoiRow({
       onClick={onSelect}
     >
       <div className="flex items-center gap-2">
+        <label
+          className="relative flex h-9 w-9 flex-none cursor-pointer items-center justify-center overflow-hidden rounded-[9px] border border-[var(--adm-line)] bg-[var(--adm-surface)] hover:border-black"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {imagePreview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imagePreview} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+              <path d="M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6" />
+            </svg>
+          )}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setImagePreview(URL.createObjectURL(file));
+              save({ image: file });
+              e.target.value = "";
+            }}
+          />
+        </label>
         <input
           defaultValue={poi.title}
           onBlur={(e) => {
@@ -461,6 +502,17 @@ function PoiRow({
           </svg>
         </button>
       </div>
+
+      <textarea
+        defaultValue={poi.description}
+        onClick={(e) => e.stopPropagation()}
+        onBlur={(e) => {
+          if (e.target.value !== poi.description) save({ description: e.target.value });
+        }}
+        rows={2}
+        placeholder="Describe el punto en una o dos líneas."
+        className="resize-y rounded-[9px] border border-transparent bg-transparent px-2 py-1.5 text-[12.5px] leading-[1.5] hover:border-[var(--adm-border-input)] focus:border-black"
+      />
 
       <div className="flex flex-wrap gap-1.5">
         {icons.map((icon) => (
@@ -497,6 +549,24 @@ function PoiRow({
             {BLINK_LABELS[blink]}
           </button>
         ))}
+      </div>
+
+      <div
+        className="flex items-center gap-2 rounded-full border border-[var(--adm-line)] px-3 py-1.5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#6b6b6b]">Tamaño</span>
+        <input
+          type="range"
+          min={50}
+          max={200}
+          value={iconSize}
+          disabled={busy}
+          onChange={(e) => setIconSize(Number(e.target.value))}
+          onPointerUp={() => save({ iconSize })}
+          className="h-1 flex-1 accent-black"
+        />
+        <span className="min-w-[34px] text-right text-[11.5px] font-bold">{iconSize}%</span>
       </div>
 
       <button

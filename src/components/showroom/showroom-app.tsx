@@ -463,6 +463,7 @@ export function ShowroomApp({ initialVehicleSlug, catalog }: ShowroomAppProps) {
               onClose={() => setActivePoiId(null)}
               desktopBottomOffset={isDesktop && effectiveViewMode === "exterior" ? desktopPanelBottom : undefined}
               anchorRect={effectiveViewMode === "interior" ? (interiorPoiAnchor ?? undefined) : undefined}
+              isDesktop={isDesktop}
             />
           )}
         </AnimatePresence>

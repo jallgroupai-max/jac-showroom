@@ -49,61 +49,75 @@ export function PointsOfInterest({ points, mode, activeId, onActiveChange, hideI
 
   return (
     <div className="flex flex-row gap-3">
-      {filtered.map((poi) => (
-        <div key={poi.id} className="relative">
-          {/* Efecto "gota de agua": un anillo que nace del tamaño del botón y
-              se aleja agrandándose mientras se desvanece, en loop. Color y
-              opacidad de pico DISTINTOS por dispositivo — ver RIPPLE_MOBILE
-              / RIPPLE_DESKTOP arriba. Van detrás del botón (antes en el DOM,
-              sin z-index) para no tapar el ícono. */}
-          <div className="pointer-events-none absolute inset-0 rounded-full" aria-hidden>
-            <motion.span
-              className="absolute inset-0 rounded-full border-2"
-              style={{ borderColor: ripple.color }}
-              initial={{ scale: 1, opacity: 0 }}
-              animate={{ scale: [1, ripple.maxScale], opacity: [0, ripple.peakOpacity, 0] }}
-              transition={{ duration: RIPPLE_DURATION, repeat: Infinity, ease: "easeOut" }}
-            />
-          </div>
-          <button
-            type="button"
-            aria-label={poi.title}
-            title={poi.title}
-            onClick={() => onActiveChange(activeId === poi.id ? null : poi.id)}
-            className={cn(
-              "flex h-13 w-13 items-center justify-center rounded-full bg-white/85 text-[#12141A] shadow-sm backdrop-blur transition-transform hover:scale-105",
-              activeId === poi.id && "ring-2 ring-[#111318]"
-            )}
-          >
-            {/* Ícono grande respecto al círculo (≈70%), fiel al Figma — solo
-                queda un anillo fino de aire alrededor. */}
-            {/* eslint-disable-next-line @next/next/no-img-element -- ícono SVG suelto de recursos/Iconos */}
-            <img src={iconAssetUrl(poi.icon)} alt="" aria-hidden className="h-10 w-10" />
-          </button>
-          {!hideInlineDetail && active?.id === poi.id && (
-            <div
-              role="tooltip"
-              className="absolute bottom-12 left-0 w-56 rounded-xl bg-white p-3 pr-8 text-left shadow-lg"
-            >
-              <button
-                type="button"
-                aria-label="Cerrar"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onActiveChange(null);
-                }}
-                className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-[#6B7280] transition-colors hover:bg-[#F4F6F9] hover:text-[#12141A]"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3.5 w-3.5">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-              <p className="text-sm font-bold text-[#12141A]">{active.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">{active.description}</p>
+      {filtered.map((poi) => {
+        // Tailwind no puede interpolar un valor de runtime en una clase
+        // estática (h-13/h-10) — el tamaño configurable desde el panel
+        // (iconSize, 100 = normal) se aplica vía style inline.
+        const sizeRatio = (poi.iconSize ?? 100) / 100;
+        const buttonSize = Math.round(52 * sizeRatio);
+        const iconSize = Math.round(40 * sizeRatio);
+        return (
+          <div key={poi.id} className="relative">
+            {/* Efecto "gota de agua": un anillo que nace del tamaño del botón y
+                se aleja agrandándose mientras se desvanece, en loop. Color y
+                opacidad de pico DISTINTOS por dispositivo — ver RIPPLE_MOBILE
+                / RIPPLE_DESKTOP arriba. Van detrás del botón (antes en el DOM,
+                sin z-index) para no tapar el ícono. */}
+            <div className="pointer-events-none absolute inset-0 rounded-full" aria-hidden>
+              <motion.span
+                className="absolute inset-0 rounded-full border-2"
+                style={{ borderColor: ripple.color }}
+                initial={{ scale: 1, opacity: 0 }}
+                animate={{ scale: [1, ripple.maxScale], opacity: [0, ripple.peakOpacity, 0] }}
+                transition={{ duration: RIPPLE_DURATION, repeat: Infinity, ease: "easeOut" }}
+              />
             </div>
-          )}
-        </div>
-      ))}
+            <button
+              type="button"
+              aria-label={poi.title}
+              title={poi.title}
+              onClick={() => onActiveChange(activeId === poi.id ? null : poi.id)}
+              style={{ width: buttonSize, height: buttonSize }}
+              className={cn(
+                "flex items-center justify-center rounded-full bg-white/85 text-[#12141A] shadow-sm backdrop-blur transition-transform hover:scale-105",
+                activeId === poi.id && "ring-2 ring-[#111318]"
+              )}
+            >
+              {/* Ícono grande respecto al círculo (≈70%), fiel al Figma — solo
+                  queda un anillo fino de aire alrededor. */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- ícono SVG suelto de recursos/Iconos */}
+              <img
+                src={iconAssetUrl(poi.icon)}
+                alt=""
+                aria-hidden
+                style={{ width: iconSize, height: iconSize }}
+              />
+            </button>
+            {!hideInlineDetail && active?.id === poi.id && (
+              <div
+                role="tooltip"
+                className="absolute bottom-12 left-0 w-56 rounded-xl bg-white p-3 pr-8 text-left shadow-lg"
+              >
+                <button
+                  type="button"
+                  aria-label="Cerrar"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onActiveChange(null);
+                  }}
+                  className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-[#6B7280] transition-colors hover:bg-[#F4F6F9] hover:text-[#12141A]"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3.5 w-3.5">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+                <p className="text-sm font-bold text-[#12141A]">{active.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#6B7280]">{active.description}</p>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -264,8 +264,17 @@ model PointOfInterest {
   iconId      String
   title       String
   description String   @default("")
+  // EXTERIOR: recorte 9:16 (desktop). INTERIOR: única imagen del punto.
   imageUrl    String?
+  // EXTERIOR únicamente: recorte 16:9 (mobile) — distinto del recorte de
+  // imageUrl, no una resolución derivada (misma foto fuente, dos recortes).
+  // Null hasta que el admin complete ambos recortes.
+  imageMobileUrl String?
   order       Int      @default(0)
+  // Tamaño del marcador, % relativo al tamaño base de cada renderer (100 =
+  // normal). Per-punto, no en HotspotIcon (catálogo compartido reusado por
+  // muchos puntos/vehículos).
+  iconSize Int @default(100)
   // EXTERIOR: fotograma (1–36) al que rota el vehículo al abrirlo.
   frame Int?
   // INTERIOR: posición sobre la panorámica, NORMALIZADA 0–1 (plan §1.5) —

@@ -219,7 +219,11 @@ export async function saveVehicleSpecs(
               title: parsed.data.title,
               order: 0,
               items: {
-                create: [{ label: "Motor", value: parsed.data.motor, order: 0 }],
+                create: parsed.data.items.map((item, order) => ({
+                  label: item.label,
+                  value: item.value,
+                  order,
+                })),
               },
             },
           ],
@@ -285,6 +289,12 @@ export async function setVehicleStatus(
   });
 
   revalidatePath("/admin/vehiculos");
+  // Defensa en profundidad: /page.tsx y /[vehicleSlug]/page.tsx ya son
+  // force-dynamic (sin caché de servidor), pero un pausado/republicado debe
+  // reflejarse igual si eso cambia algún día, o ante el router cache del
+  // cliente en una navegación sin recarga dura.
+  revalidatePath("/");
+  revalidatePath(`/${vehicle.slug}`);
   return { ok: true, id: vehicleId };
 }
 
@@ -358,6 +368,9 @@ export async function publishVehicle(vehicleId: string): Promise<ActionResult> {
 
   revalidatePath("/admin/vehiculos");
   revalidatePath(`/admin/vehiculos/${vehicleId}`);
+  // Ver comentario en setVehicleStatus — mismo motivo.
+  revalidatePath("/");
+  revalidatePath(`/${vehicle.slug}`);
   return { ok: true, id: vehicleId };
 }
 
