@@ -35,7 +35,7 @@ echo "[OK] En carpeta: $(pwd)"
 
 # git config --global --add safe.directory "$PROJECT_PATH"
 echo "[0/4] Pulling ultimos cambios..."
-git pull https://$GITHUB_ACCESS_TOKEN@github.com/$GITHUB_USER/$GITHUB_REPO.git staging
+git pull https://$GITHUB_ACCESS_TOKEN@github.com/$GITHUB_USER/$GITHUB_REPO.git main
 if [ $? -ne 0 ]; then
     echo "[ERROR] git pull falló (revisa permisos SSH, conflictos de merge o cambios locales sin commitear). Abortando deploy."
     exit 1
