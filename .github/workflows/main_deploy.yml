@@ -20,4 +20,4 @@ jobs:
           ssh -p ${{ secrets.SSH_PORT }} \
               -o StrictHostKeyChecking=no \
               ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-              "bash -l /home/bel/Showroom/src/deploy.sh 2>&1"
+              "bash -l /home/bel/Showroom/src/jac-vzla-showroom360/deploy.sh 2>&1"
