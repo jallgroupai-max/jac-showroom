@@ -32,6 +32,12 @@ services:
       # Dentro de la red de compose el host es `postgres`, no localhost.
       DATABASE_URL: postgresql://jac:${POSTGRES_PASSWORD:-jac_dev}@postgres:5432/jac_showroom
       AUTH_SECRET: ${AUTH_SECRET:?Define AUTH_SECRET en .env}
+      # Auth.js v5 fuera de Vercel: sin esto lanza UntrustedHost al hacer
+      # signIn detrás del proxy (nginx) y la server action del login da 500.
+      AUTH_TRUST_HOST: "true"
+      # URL pública del sitio (con el subdominio real). Vacío = Auth.js
+      # deduce el host de las cabeceras x-forwarded-* que manda nginx.
+      AUTH_URL: ${AUTH_URL:-}
     volumes:
       # Compartido con el worker: la web guarda los ZIP/imágenes subidos y el
       # worker escribe ahí los sprites procesados que la web luego sirve.
