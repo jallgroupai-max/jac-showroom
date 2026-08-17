@@ -1,17 +1,59 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { authenticate } from "./actions";
 
 // Réplica 1:1 de la columna derecha del Login del prototipo (plan §0.6):
 // inputs de 50px radio 12, botón pill negro de 52px, checkbox accent negro.
+//
+// POST JSON a un Route Handler en vez de Server Action bindeada al form
+// (plan A7 — hotfix WAF): `<form action={serverAction}>` hace que React
+// serialice la llamada como multipart/form-data con campos
+// `$ACTION_REF`/`$ACTION_KEY`, que el WAF de producción bloquea como
+// posible inyección NoSQL. Ver src/app/api/admin/login/route.ts.
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
-  const [errorMessage, formAction, isPending] = useActionState(authenticate, undefined);
+  const router = useRouter();
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [isPending, setIsPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsPending(true);
+    setErrorMessage(undefined);
+
+    const formData = new FormData(event.currentTarget);
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.get("email"),
+          password: formData.get("password"),
+          redirectTo: formData.get("redirectTo"),
+        }),
+      });
+
+      const data = (await response.json()) as { redirectTo?: string; error?: string };
+
+      if (!response.ok) {
+        setErrorMessage(data.error ?? "Correo o contraseña incorrectos.");
+        setIsPending(false);
+        return;
+      }
+
+      router.push(data.redirectTo ?? "/admin");
+      router.refresh();
+    } catch {
+      setErrorMessage("No se pudo conectar con el servidor. Intenta de nuevo.");
+      setIsPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="flex w-full max-w-[400px] flex-col gap-[26px]">
+    <form onSubmit={handleSubmit} className="flex w-full max-w-[400px] flex-col gap-[26px]">
       <div>
         <h2 className="mb-2 text-[28px] font-bold tracking-[-0.025em]">Iniciar sesión</h2>
         <p className="text-sm text-[var(--adm-muted)]">Accede con tu cuenta corporativa.</p>

@@ -20,6 +20,13 @@ export async function proxy(request: NextRequest) {
     secureCookie: request.nextUrl.protocol === "https:",
   });
 
+  // /api/admin/login es la única API pública del panel — es el propio
+  // Route Handler de login (POST JSON, ver login-form.tsx), no tiene sesión
+  // todavía por definición.
+  if (pathname === "/api/admin/login") {
+    return NextResponse.next();
+  }
+
   // API protegida: sin sesión → 401 JSON, nunca redirect (es un fetch).
   if (pathname.startsWith("/api/admin")) {
     if (!token) {
