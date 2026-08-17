@@ -21,18 +21,33 @@ export async function POST(request: NextRequest) {
   const safeRedirect =
     typeof redirectTo === "string" && redirectTo.startsWith("/admin") ? redirectTo : "/admin";
 
+  const invalid = NextResponse.json(
+    // Texto deliberadamente genérico: no revelar si el correo existe.
+    { error: "Correo o contraseña incorrectos." },
+    { status: 401 },
+  );
+
   try {
-    await signIn("credentials", {
+    const outcome = await signIn("credentials", {
       email,
       password,
       redirectTo: safeRedirect,
       redirect: false,
     });
+
+    // `signIn` con `redirect:false` NO lanza cuando las credenciales fallan:
+    // devuelve la URL de la página de error (…/admin/login?error=Credentials
+    // Signin) y deja la petición sin cookie de sesión. Sin comprobarlo, el
+    // login respondía 200 a un intento fallido, el cliente navegaba a /admin
+    // y el proxy lo devolvía al login — la pantalla que no avanzaba nunca.
+    if (typeof outcome === "string" && new URL(outcome, request.url).searchParams.has("error")) {
+      return invalid;
+    }
+
     return NextResponse.json({ redirectTo: safeRedirect });
   } catch (error) {
-    if (error instanceof AuthError) {
-      return NextResponse.json({ error: "Correo o contraseña incorrectos." }, { status: 401 });
-    }
+    // Camino alterno: según la versión, Auth.js sí lanza en algunos fallos.
+    if (error instanceof AuthError) return invalid;
     throw error;
   }
 }
