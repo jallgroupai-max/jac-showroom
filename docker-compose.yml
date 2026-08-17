@@ -1,12 +1,18 @@
 # Despliegue:
-#   docker compose --env-file environments/.env run --rm migrate
-#   docker compose --env-file environments/.env run --rm seed
 #   docker compose --env-file environments/.env up -d --build
 # (el .env vive en environments/, no en la raíz — así lo pide la
-# estructura de DevOps. Sin --env-file, ${...} abajo quedan sin resolver.
-# migrate y seed corren ANTES de levantar showroom, en ese orden — seed
-# es idempotente (upsert), así que correrlo de nuevo en cada deploy no
-# duplica ni resetea datos existentes.)
+# estructura de DevOps. Sin --env-file, ${...} abajo quedan sin resolver.)
+#
+# El orden migrate → seed → seed-catalog lo garantiza `depends_on` con
+# condition: service_completed_successfully, así que ya NO hace falta
+# lanzarlos a mano: un `up -d` los encadena solo. Los tres son jobs de un
+# solo uso (restart: "no") e idempotentes — migrate aplica solo lo
+# pendiente, seed hace upsert y seed-catalog omite los slugs que ya
+# existen, así que repetirlos en cada deploy no duplica ni resetea nada.
+#
+# showroom espera SOLO a migrate: el esquema sí es requisito para servir,
+# pero un fallo de los seeds (datos de ejemplo) no debe dejar el sitio
+# caído.
 
 services:
   migrate:
@@ -21,6 +27,7 @@ services:
       - showroom_network
     restart: "no"
 
+  # Base mínima: admin, categorías, dealer e íconos de hotspot.
   seed:
     build:
       context: .
@@ -32,6 +39,29 @@ services:
       - SEED_ADMIN_EMAIL=${SEED_ADMIN_EMAIL}
       - SEED_ADMIN_NAME=${SEED_ADMIN_NAME}
       - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - showroom_network
+    restart: "no"
+
+  # Catálogo de vehículos del mock (9 modelos PUBLISHED con sus colores,
+  # specs y puntos de interés). Misma imagen que seed, solo cambia el
+  # script. Va DESPUÉS de seed: resuelve category.slug → id contra las
+  # categorías que aquel crea, así que sin él no encontraría ninguna.
+  seed-catalog:
+    build:
+      context: .
+      target: seeder
+    image: jac-showroom-seed:latest
+    container_name: jac-showroom-seed-catalog
+    command: ["node", "prisma/seed-catalog.mjs"]
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
     networks:
       - showroom_network
     restart: "no"
@@ -56,6 +86,9 @@ services:
       # Ambas ya existían en environments/.env; faltaba pasarlas al contenedor.
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     secrets:
       - db_password
     networks:
