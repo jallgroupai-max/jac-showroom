@@ -48,6 +48,14 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
       - POSTGRES_DB=${POSTGRES_DB}
+      # Auth.js NO arranca sin AUTH_SECRET: sin ella devuelve 500 en todo
+      # /api/auth/*, signIn no emite la cookie de sesión y el proxy (que
+      # llama a getToken con ese mismo secreto) rebota siempre al login.
+      # AUTH_TRUST_HOST es obligatoria detrás del nginx/WAF que terminan el
+      # TLS — Auth.js deriva el host de las cabeceras x-forwarded-*.
+      # Ambas ya existían en environments/.env; faltaba pasarlas al contenedor.
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
     secrets:
       - db_password
     networks:
