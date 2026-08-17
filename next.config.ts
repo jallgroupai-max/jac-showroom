@@ -4,14 +4,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  // Las imágenes de escenario del panel llegan como FormData a una server
-  // action (Fase A1, storage local); el límite por defecto es 1MB. Los ZIP
-  // de 360° NO pasan por aquí — van directo al storage (plan §2.3).
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "25mb",
-    },
-  },
+  // Ya no hay Server Actions en el proyecto (plan A7 — hotfix WAF: todas las
+  // mutaciones del panel son Route Handlers con cuerpo JSON, ver
+  // src/lib/admin/api.ts), así que `experimental.serverActions.bodySizeLimit`
+  // quedó sin efecto y se retiró. Los Route Handlers no imponen el límite de
+  // 1MB que sí tenían las actions. Los ZIP de 360° siguen sin pasar por aquí
+  // — van directo al storage (plan §2.3).
   // "standalone" SOLO para la imagen Docker (el Dockerfile exporta
   // BUILD_STANDALONE=1): genera .next/standalone con server.js y los
   // node_modules mínimos trazados. El flujo local de `npm run build` +

@@ -10,7 +10,7 @@ import { Step6Scenarios } from "../wizard/step6-scenarios";
 import { getWizardFormData, getVehicleWithCounts } from "../wizard/data";
 import { WIZARD_STEPS } from "../wizard/steps";
 import { PublishBar } from "../wizard/publish-bar";
-import { getPublishBlockers } from "../actions";
+import { getPublishBlockers } from "@/lib/admin/services/vehicles";
 
 // Edición por pasos de un vehículo existente. ?paso=N — los pasos de fases
 // futuras (3-6) caen al paso 1 hasta que su fase los habilite.

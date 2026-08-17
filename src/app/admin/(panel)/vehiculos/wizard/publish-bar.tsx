@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { publishVehicle, setVehicleStatus, getPreviewUrl } from "../actions";
+import { publishVehicle, setVehicleStatus, getPreviewUrl } from "@/lib/admin/api";
 
 // Barra de publicación del wizard (prototipo: "Previsualizar" + "Publicar
 // vehículo" en el header). Las guardas se calculan en el servidor y llegan

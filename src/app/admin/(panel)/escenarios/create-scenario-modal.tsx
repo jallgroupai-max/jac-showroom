@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createScenario } from "./actions";
+import { createScenario } from "@/lib/admin/api";
 
 // Modal de alta — mismo patrón visual que el del prototipo, con el selector
 // de tipo que ni el prototipo ni el artefacto contemplaban (§1.7): imagen

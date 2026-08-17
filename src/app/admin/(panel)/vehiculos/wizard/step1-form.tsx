@@ -6,7 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { vehicleBasicsSchema, type VehicleBasicsInput } from "@/lib/admin/schemas";
 import { slugify } from "@/lib/admin/slug";
-import { createVehicle, updateVehicleBasics, saveVehicleCardImage, removeVehicleCardImage } from "../actions";
+import { createVehicle, updateVehicleBasics, saveVehicleCardImage, removeVehicleCardImage } from "@/lib/admin/api";
 import { CatalogIcon, CATEGORY_ICON_PATHS, FALLBACK_CATEGORY_PATH, HotspotIconImage } from "./catalog-icon";
 
 type CategoryOption = { id: string; slug: string; name: string; vehicleCount: number };

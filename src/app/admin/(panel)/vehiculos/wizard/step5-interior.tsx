@@ -6,7 +6,7 @@ import { Viewer, EquirectangularAdapter } from "@photo-sphere-viewer/core";
 import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import "@photo-sphere-viewer/core/index.css";
 import "@photo-sphere-viewer/markers-plugin/index.css";
-import { saveInteriorPoi, deletePoi } from "../poi-actions";
+import { saveInteriorPoi, deletePoi } from "@/lib/admin/api";
 import { HotspotIconImage } from "./catalog-icon";
 
 // Paso 5 — Imagen 360° del interior y puntos de interés (Req 6/7).

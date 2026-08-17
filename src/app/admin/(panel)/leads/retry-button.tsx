@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { retryLeadSync } from "./actions";
+import { retryLeadSync } from "@/lib/admin/api";
 
 export function RetryLeadButton({ leadId }: { leadId: string }) {
   const router = useRouter();

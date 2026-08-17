@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Cropper, { type Area, type Point } from "react-easy-crop";
-import { saveExteriorPoi, deletePoi } from "../poi-actions";
+import { saveExteriorPoi, deletePoi } from "@/lib/admin/api";
 import { getCroppedImageBlob } from "@/lib/admin/crop-image";
 import { HotspotIconImage } from "./catalog-icon";
 

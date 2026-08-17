@@ -1,27 +1,19 @@
-"use server";
-
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
-import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/admin/audit";
 import { saveUpload, deleteUpload } from "@/lib/storage";
-import {
-  vehicleBasicsSchema,
-  vehicleSpecsSchema,
-  type VehicleBasicsInput,
-  type VehicleSpecsInput,
-} from "@/lib/admin/schemas";
-
-type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
+import { decodeJsonFile } from "@/lib/admin/json-file";
+import { vehicleBasicsSchema, vehicleSpecsSchema } from "@/lib/admin/schemas";
+import type { ActionResult } from "@/lib/admin/api-types";
+import type { AdminUser } from "@prisma/client";
 
 // ————————————————————————————————————————————————————————————————
 // Paso 1 — crear el vehículo en borrador (§0.2: el registro existe ANTES de
 // poder colgarle assets; los ZIP se suben contra /vehicles/:id/colors).
 // ————————————————————————————————————————————————————————————————
 
-export async function createVehicle(input: VehicleBasicsInput): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function createVehicle(user: AdminUser, input: unknown): Promise<ActionResult> {
   const parsed = vehicleBasicsSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -70,10 +62,10 @@ export async function createVehicle(input: VehicleBasicsInput): Promise<ActionRe
 // ————————————————————————————————————————————————————————————————
 
 export async function updateVehicleBasics(
+  user: AdminUser,
   vehicleId: string,
-  input: VehicleBasicsInput,
+  input: unknown,
 ): Promise<ActionResult> {
-  const user = await requireAdminUser();
   const parsed = vehicleBasicsSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -128,19 +120,22 @@ export async function updateVehicleBasics(
 // creado — igual que el fondo propio del paso 6.
 // ————————————————————————————————————————————————————————————————
 
-export async function saveVehicleCardImage(vehicleId: string, formData: FormData): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function saveVehicleCardImage(
+  user: AdminUser,
+  vehicleId: string,
+  fileInput: unknown,
+): Promise<ActionResult> {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle || vehicle.status === "ARCHIVED") return { ok: false, error: "El vehículo no existe." };
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
+  const file = decodeJsonFile(fileInput);
+  if (!file) {
     return { ok: false, error: "Selecciona una imagen (JPG, PNG o WebP)." };
   }
 
   let normalized: Buffer;
   try {
-    normalized = await sharp(Buffer.from(await file.arrayBuffer()))
+    normalized = await sharp(file.buffer)
       .resize({ width: 1600, withoutEnlargement: true })
       .webp({ quality: 85 })
       .toBuffer();
@@ -157,7 +152,7 @@ export async function saveVehicleCardImage(vehicleId: string, formData: FormData
       action: "upload-card-image",
       entityType: "Vehicle",
       entityId: vehicleId,
-      detail: { bytes: file.size },
+      detail: { bytes: file.buffer.length },
     });
   });
   if (previous) await deleteUpload(previous);
@@ -167,8 +162,10 @@ export async function saveVehicleCardImage(vehicleId: string, formData: FormData
   return { ok: true };
 }
 
-export async function removeVehicleCardImage(vehicleId: string): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function removeVehicleCardImage(
+  user: AdminUser,
+  vehicleId: string,
+): Promise<ActionResult> {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) return { ok: false, error: "El vehículo no existe." };
 
@@ -193,10 +190,10 @@ export async function removeVehicleCardImage(vehicleId: string): Promise<ActionR
 // ————————————————————————————————————————————————————————————————
 
 export async function saveVehicleSpecs(
+  user: AdminUser,
   vehicleId: string,
-  input: VehicleSpecsInput,
+  input: unknown,
 ): Promise<ActionResult> {
-  const user = await requireAdminUser();
   const parsed = vehicleSpecsSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -253,11 +250,17 @@ const TRANSITIONS = {
   republish: { from: "PAUSED", to: "PUBLISHED" },
 } as const;
 
+export type StatusAction = keyof typeof TRANSITIONS | "archive";
+
+export function isStatusAction(value: unknown): value is StatusAction {
+  return value === "archive" || value === "pause" || value === "republish";
+}
+
 export async function setVehicleStatus(
+  user: AdminUser,
   vehicleId: string,
-  action: keyof typeof TRANSITIONS | "archive",
+  action: StatusAction,
 ): Promise<ActionResult> {
-  const user = await requireAdminUser();
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) return { ok: false, error: "El vehículo no existe." };
 
@@ -269,7 +272,10 @@ export async function setVehicleStatus(
   } else {
     const t = TRANSITIONS[action];
     if (vehicle.status !== t.from) {
-      return { ok: false, error: `No se puede ${action === "pause" ? "pausar" : "republicar"} desde el estado actual.` };
+      return {
+        ok: false,
+        error: `No se puede ${action === "pause" ? "pausar" : "republicar"} desde el estado actual.`,
+      };
     }
     to = t.to;
   }
@@ -297,11 +303,6 @@ export async function setVehicleStatus(
   revalidatePath(`/${vehicle.slug}`);
   return { ok: true, id: vehicleId };
 }
-
-// ————————————————————————————————————————————————————————————————
-// Orden en el catálogo (types.ts: Vehicle.order — hoy no hay otra forma de
-// decidir qué vehículo sale primero).
-// ————————————————————————————————————————————————————————————————
 
 // ————————————————————————————————————————————————————————————————
 // Publicación (Fase A5) — con GUARDAS: lo que le falte al vehículo se
@@ -340,12 +341,13 @@ export async function getPublishBlockers(vehicleId: string): Promise<string[]> {
   return blockers;
 }
 
-export async function publishVehicle(vehicleId: string): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function publishVehicle(user: AdminUser, vehicleId: string): Promise<ActionResult> {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) return { ok: false, error: "El vehículo no existe." };
   if (vehicle.status === "PUBLISHED") return { ok: true, id: vehicleId };
-  if (vehicle.status === "ARCHIVED") return { ok: false, error: "Un vehículo archivado no se puede publicar." };
+  if (vehicle.status === "ARCHIVED") {
+    return { ok: false, error: "Un vehículo archivado no se puede publicar." };
+  }
 
   const blockers = await getPublishBlockers(vehicleId);
   if (blockers.length > 0) {
@@ -377,7 +379,6 @@ export async function publishVehicle(vehicleId: string): Promise<ActionResult> {
 /** URL de previsualización con token firmado de corta vida (plan §1.8): la
  * única forma de ver un borrador — por URL directa responde 404. */
 export async function getPreviewUrl(vehicleId: string): Promise<ActionResult & { url?: string }> {
-  await requireAdminUser();
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) return { ok: false, error: "El vehículo no existe." };
   const { createPreviewToken } = await import("@/lib/preview-token");
@@ -389,11 +390,11 @@ export async function getPreviewUrl(vehicleId: string): Promise<ActionResult & {
 // ————————————————————————————————————————————————————————————————
 
 export async function toggleVehicleScenario(
+  user: AdminUser,
   vehicleId: string,
   scenarioId: string,
   enabled: boolean,
 ): Promise<ActionResult> {
-  const user = await requireAdminUser();
   const [vehicle, scenario] = await Promise.all([
     prisma.vehicle.findUnique({ where: { id: vehicleId } }),
     prisma.scenario.findUnique({ where: { id: scenarioId } }),
@@ -423,19 +424,22 @@ export async function toggleVehicleScenario(
 
 // Fondo "propio" del vehículo — el default del selector de Escena del
 // showroom (TRD §4.5): distinto por modelo, no viene del catálogo global.
-export async function saveOwnBackground(vehicleId: string, formData: FormData): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function saveOwnBackground(
+  user: AdminUser,
+  vehicleId: string,
+  fileInput: unknown,
+): Promise<ActionResult> {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle || vehicle.status === "ARCHIVED") return { ok: false, error: "El vehículo no existe." };
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
+  const file = decodeJsonFile(fileInput);
+  if (!file) {
     return { ok: false, error: "Selecciona una imagen (JPG, PNG o WebP)." };
   }
 
   let normalized: Buffer;
   try {
-    normalized = await sharp(Buffer.from(await file.arrayBuffer()))
+    normalized = await sharp(file.buffer)
       .resize({ width: 3840, withoutEnlargement: true })
       .webp({ quality: 80 })
       .toBuffer();
@@ -455,7 +459,7 @@ export async function saveOwnBackground(vehicleId: string, formData: FormData): 
       action: "upload-own-background",
       entityType: "Vehicle",
       entityId: vehicleId,
-      detail: { bytes: file.size },
+      detail: { bytes: file.buffer.length },
     });
   });
   if (previous) await deleteUpload(previous);
@@ -464,8 +468,10 @@ export async function saveOwnBackground(vehicleId: string, formData: FormData): 
   return { ok: true };
 }
 
-export async function removeOwnBackground(vehicleId: string): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function removeOwnBackground(
+  user: AdminUser,
+  vehicleId: string,
+): Promise<ActionResult> {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) return { ok: false, error: "El vehículo no existe." };
 
@@ -489,8 +495,11 @@ export async function removeOwnBackground(vehicleId: string): Promise<ActionResu
 // decidir qué vehículo sale primero).
 // ————————————————————————————————————————————————————————————————
 
-export async function moveVehicle(vehicleId: string, direction: "up" | "down"): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function moveVehicle(
+  user: AdminUser,
+  vehicleId: string,
+  direction: "up" | "down",
+): Promise<ActionResult> {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) return { ok: false, error: "El vehículo no existe." };
 

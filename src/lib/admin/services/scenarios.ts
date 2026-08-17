@@ -1,14 +1,12 @@
-"use server";
-
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
 import { z } from "zod";
-import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/admin/audit";
 import { saveUpload, deleteUpload } from "@/lib/storage";
-
-type ActionResult = { ok: true } | { ok: false; error: string };
+import { decodeJsonFile } from "@/lib/admin/json-file";
+import type { ActionResult } from "@/lib/admin/api-types";
+import type { AdminUser } from "@prisma/client";
 
 // Catálogo global de escenarios (plan §1.7): DOS tipos de entrada — imagen
 // (foto de ambiente) o color sólido (paleta neutra que el showroom ya
@@ -23,16 +21,15 @@ const IMAGE_TYPES: Record<string, string> = {
   "image/webp": "webp",
 };
 
-export async function createScenario(formData: FormData): Promise<ActionResult> {
-  const user = await requireAdminUser();
-
-  const label = labelSchema.safeParse(formData.get("label"));
+export async function createScenario(
+  user: AdminUser,
+  input: { label: unknown; kind: unknown; color?: unknown; file?: unknown },
+): Promise<ActionResult> {
+  const label = labelSchema.safeParse(input.label);
   if (!label.success) return { ok: false, error: label.error.issues[0].message };
 
-  const kind = formData.get("kind");
-
-  if (kind === "color") {
-    const color = hexSchema.safeParse(formData.get("color"));
+  if (input.kind === "color") {
+    const color = hexSchema.safeParse(input.color);
     if (!color.success) return { ok: false, error: color.error.issues[0].message };
 
     const scenario = await prisma.scenario.create({
@@ -45,9 +42,9 @@ export async function createScenario(formData: FormData): Promise<ActionResult> 
       entityId: scenario.id,
       detail: { label: label.data, kind: "color" },
     });
-  } else if (kind === "image") {
-    const file = formData.get("file");
-    if (!(file instanceof File) || file.size === 0) {
+  } else if (input.kind === "image") {
+    const file = decodeJsonFile(input.file);
+    if (!file) {
       return { ok: false, error: "Selecciona una imagen (JPG, PNG o WebP)." };
     }
     if (!IMAGE_TYPES[file.type]) {
@@ -56,10 +53,9 @@ export async function createScenario(formData: FormData): Promise<ActionResult> 
 
     // Normalización a WebP (plan A2): valida que sea imagen real, capa el
     // ancho a 3840 (resolución recomendada del prototipo) y unifica formato.
-    const original = Buffer.from(await file.arrayBuffer());
     let normalized: Buffer;
     try {
-      normalized = await sharp(original)
+      normalized = await sharp(file.buffer)
         .resize({ width: 3840, withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer();
@@ -76,7 +72,7 @@ export async function createScenario(formData: FormData): Promise<ActionResult> 
       action: "create",
       entityType: "Scenario",
       entityId: scenario.id,
-      detail: { label: label.data, kind: "image", bytes: file.size },
+      detail: { label: label.data, kind: "image", bytes: file.buffer.length },
     });
   } else {
     return { ok: false, error: "Tipo de escenario desconocido." };
@@ -86,9 +82,11 @@ export async function createScenario(formData: FormData): Promise<ActionResult> 
   return { ok: true };
 }
 
-export async function deleteScenario(scenarioId: string, force: boolean): Promise<ActionResult> {
-  const user = await requireAdminUser();
-
+export async function deleteScenario(
+  user: AdminUser,
+  scenarioId: string,
+  force: boolean,
+): Promise<ActionResult> {
   const scenario = await prisma.scenario.findUnique({
     where: { id: scenarioId },
     include: { _count: { select: { vehicles: true } } },

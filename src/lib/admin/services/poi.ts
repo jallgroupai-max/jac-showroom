@@ -1,19 +1,17 @@
-"use server";
-
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
 import { z } from "zod";
-import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/admin/audit";
 import { saveUpload, deleteUpload } from "@/lib/storage";
+import { decodeJsonFile } from "@/lib/admin/json-file";
+import type { ActionResult } from "@/lib/admin/api-types";
+import type { AdminUser } from "@prisma/client";
 
-// Acciones de puntos de interés (Fase A3). Una sola tabla para destacado y
-// punto (plan §1.5): el paso 4 edita el CONTENIDO de los de exterior
-// (ícono, título, descripción, imagen, frame) y el paso 5 POSICIONA los de
-// interior sobre la panorámica (textureX/Y normalizados 0–1 + blink).
-
-type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
+// Puntos de interés (Fase A3). Una sola tabla para destacado y punto (plan
+// §1.5): el paso 4 edita el CONTENIDO de los de exterior (ícono, título,
+// descripción, imagen, frame) y el paso 5 POSICIONA los de interior sobre la
+// panorámica (textureX/Y normalizados 0–1 + blink).
 
 const iconSizeSchema = z.coerce.number().int().min(50).max(200).default(100);
 
@@ -39,23 +37,30 @@ const interiorSchema = z.object({
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+/** Los campos opcionales llegan como null desde JSON; los esquemas con
+ * `.default()` solo lo aplican ante undefined (`Number(null)` sería 0). */
+function optional(value: unknown): unknown {
+  return value ?? undefined;
+}
+
 // Comprime y sube un recorte de imagen de POI (mismo criterio que
 // escenarios; artefacto Req 5). Compartido por el destacado de exterior
 // (dos recortes: desktop 9:16 y mobile 16:9, ya recortados en el cliente
 // con react-easy-crop) y por la imagen única de un punto interior.
 async function processPoiImage(
-  entry: FormDataEntryValue | null,
+  entry: unknown,
   existingUrl: string | null,
   slug: string,
   suffix: string,
 ): Promise<{ ok: true; url: string | null } | { ok: false; error: string }> {
-  if (!(entry instanceof File) || entry.size === 0) return { ok: true, url: existingUrl };
-  if (!IMAGE_TYPES.has(entry.type)) {
+  const file = decodeJsonFile(entry);
+  if (!file) return { ok: true, url: existingUrl };
+  if (!IMAGE_TYPES.has(file.type)) {
     return { ok: false, error: "Formato de imagen no soportado — usa JPG, PNG o WebP." };
   }
   let compressed: Buffer;
   try {
-    compressed = await sharp(Buffer.from(await entry.arrayBuffer()))
+    compressed = await sharp(file.buffer)
       .resize({ width: 1200, withoutEnlargement: true })
       .webp({ quality: 78 })
       .toBuffer();
@@ -68,18 +73,21 @@ async function processPoiImage(
 }
 
 // ————————————————————————————————————————————————————————————————
-// Paso 4 — Destacados (exterior). FormData porque puede traer imagen.
+// Paso 4 — Destacados (exterior).
 // ————————————————————————————————————————————————————————————————
 
-export async function saveExteriorPoi(vehicleId: string, formData: FormData): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function saveExteriorPoi(
+  user: AdminUser,
+  vehicleId: string,
+  input: Record<string, unknown>,
+): Promise<ActionResult> {
   const parsed = exteriorSchema.safeParse({
-    id: formData.get("id") || undefined,
-    iconId: formData.get("iconId"),
-    title: formData.get("title"),
-    description: formData.get("description") ?? "",
-    frame: formData.get("frame"),
-    iconSize: formData.get("iconSize") ?? undefined,
+    id: optional(input.id) || undefined,
+    iconId: input.iconId,
+    title: input.title,
+    description: input.description ?? "",
+    frame: input.frame,
+    iconSize: optional(input.iconSize),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -100,14 +108,14 @@ export async function saveExteriorPoi(vehicleId: string, formData: FormData): Pr
   // recortados en el cliente (react-easy-crop); no son la misma imagen a
   // dos resoluciones, son recortes DISTINTOS.
   const desktop = await processPoiImage(
-    formData.get("imageDesktop"),
+    input.imageDesktop,
     existing?.imageUrl ?? null,
     vehicle.slug,
     "desktop",
   );
   if (!desktop.ok) return { ok: false, error: desktop.error };
   const mobile = await processPoiImage(
-    formData.get("imageMobile"),
+    input.imageMobile,
     existing?.imageMobileUrl ?? null,
     vehicle.slug,
     "mobile",
@@ -162,17 +170,20 @@ export async function saveExteriorPoi(vehicleId: string, formData: FormData): Pr
 // Paso 5 — Puntos de interior (posición normalizada 0–1, plan §1.5).
 // ————————————————————————————————————————————————————————————————
 
-export async function saveInteriorPoi(vehicleId: string, formData: FormData): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function saveInteriorPoi(
+  user: AdminUser,
+  vehicleId: string,
+  input: Record<string, unknown>,
+): Promise<ActionResult> {
   const parsed = interiorSchema.safeParse({
-    id: formData.get("id") || undefined,
-    iconId: formData.get("iconId"),
-    title: formData.get("title"),
-    description: formData.get("description") ?? "",
-    textureX: formData.get("textureX"),
-    textureY: formData.get("textureY"),
-    blink: formData.get("blink"),
-    iconSize: formData.get("iconSize") ?? undefined,
+    id: optional(input.id) || undefined,
+    iconId: input.iconId,
+    title: input.title,
+    description: input.description ?? "",
+    textureX: input.textureX,
+    textureY: input.textureY,
+    blink: input.blink,
+    iconSize: optional(input.iconSize),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -194,7 +205,12 @@ export async function saveInteriorPoi(vehicleId: string, formData: FormData): Pr
 
   // Imagen opcional del punto interior — mismo criterio de compresión que el
   // destacado de exterior (artefacto Req 5).
-  const image = await processPoiImage(formData.get("image"), existing?.imageUrl ?? null, vehicle.slug, "interior");
+  const image = await processPoiImage(
+    input.image,
+    existing?.imageUrl ?? null,
+    vehicle.slug,
+    "interior",
+  );
   if (!image.ok) return { ok: false, error: image.error };
   const imageUrl = image.url;
 
@@ -237,8 +253,11 @@ export async function saveInteriorPoi(vehicleId: string, formData: FormData): Pr
 // Eliminar (ambos modos) — borra también la imagen del destacado.
 // ————————————————————————————————————————————————————————————————
 
-export async function deletePoi(vehicleId: string, poiId: string): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function deletePoi(
+  user: AdminUser,
+  vehicleId: string,
+  poiId: string,
+): Promise<ActionResult> {
   const poi = await prisma.pointOfInterest.findUnique({ where: { id: poiId } });
   if (!poi || poi.vehicleId !== vehicleId) return { ok: false, error: "El punto no existe." };
 

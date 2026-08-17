@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { vehicleSpecsSchema, type VehicleSpecsInput } from "@/lib/admin/schemas";
-import { saveVehicleSpecs } from "../actions";
+import { saveVehicleSpecs } from "@/lib/admin/api";
 
 // Paso 2 — Ficha técnica (plan §0.2: va ANTES de los assets). Un único grupo
 // fijo (Título) con una lista LIBRE de filas etiqueta+valor — el editor envía

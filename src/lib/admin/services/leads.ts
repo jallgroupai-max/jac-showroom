@@ -1,18 +1,14 @@
-"use server";
-
 import { revalidatePath } from "next/cache";
-import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/admin/audit";
 import { sendLeadToCRM } from "@/lib/crm";
-
-type ActionResult = { ok: true } | { ok: false; error: string };
+import type { ActionResult } from "@/lib/admin/api-types";
+import type { AdminUser } from "@prisma/client";
 
 // Reintento manual de sincronización con el CRM (plan A6): para leads
 // FAILED — y también PENDING antiguos, por si el proceso murió entre la
 // persistencia y el intento de envío.
-export async function retryLeadSync(leadId: string): Promise<ActionResult> {
-  const user = await requireAdminUser();
+export async function retryLeadSync(user: AdminUser, leadId: string): Promise<ActionResult> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { ok: false, error: "El lead no existe." };
   if (lead.syncStatus === "SENT") return { ok: true };
@@ -40,5 +36,7 @@ export async function retryLeadSync(leadId: string): Promise<ActionResult> {
   });
 
   revalidatePath("/admin/leads");
-  return synced ? { ok: true } : { ok: false, error: "El CRM volvió a fallar — el lead queda para reintentar." };
+  return synced
+    ? { ok: true }
+    : { ok: false, error: "El CRM volvió a fallar — el lead queda para reintentar." };
 }

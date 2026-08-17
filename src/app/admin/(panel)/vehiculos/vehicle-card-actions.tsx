@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setVehicleStatus, moveVehicle } from "./actions";
+import { setVehicleStatus, moveVehicle } from "@/lib/admin/api";
 
 // Acciones de la card: pausar / republicar / archivar (con confirmación
 // inline — sin window.confirm) y orden con flechas. Permisos planos: todo

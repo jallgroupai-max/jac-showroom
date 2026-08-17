@@ -1,8 +1,9 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { logout } from "./actions";
+import { usePathname, useRouter } from "next/navigation";
+import { logout } from "@/lib/admin/api";
 
 // Header del panel — réplica del prototipo: marca JAC|bel, tabs en píldora
 // sobre fondo #f4f4f4 (activa: negra), botón Salir. Sticky, 66px.
@@ -15,6 +16,18 @@ const TABS = [
 
 export function AdminHeader({ userName }: { userName: string }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggingOut, startLogout] = useTransition();
+
+  // El cierre de sesión ya no redirige desde el servidor (el handler solo
+  // limpia la cookie y responde JSON): la navegación la hace el cliente.
+  function signOut() {
+    startLogout(async () => {
+      await logout();
+      router.push("/admin/login");
+      router.refresh();
+    });
+  }
 
   // "Nuevo vehículo" es más específica que "Vehículos": gana la coincidencia
   // más larga para que /admin/vehiculos/nuevo no active ambas.
@@ -68,14 +81,14 @@ export function AdminHeader({ userName }: { userName: string }) {
         >
           {userName}
         </Link>
-        <form action={logout}>
-          <button
-            type="submit"
-            className="h-[38px] cursor-pointer rounded-full border border-[var(--adm-border-input)] bg-white px-[18px] text-[13px] font-semibold transition-colors hover:border-black"
-          >
-            Salir
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={signOut}
+          disabled={isLoggingOut}
+          className="h-[38px] cursor-pointer rounded-full border border-[var(--adm-border-input)] bg-white px-[18px] text-[13px] font-semibold transition-colors hover:border-black disabled:opacity-60"
+        >
+          {isLoggingOut ? "Saliendo…" : "Salir"}
+        </button>
       </div>
     </header>
   );

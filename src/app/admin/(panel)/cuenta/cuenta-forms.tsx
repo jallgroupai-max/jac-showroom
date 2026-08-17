@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateOwnProfile, changeOwnPassword } from "./actions";
+import { updateOwnProfile, changeOwnPassword } from "@/lib/admin/api";
 
 const inputClass =
   "h-[46px] rounded-[12px] border border-[var(--adm-border-input)] bg-white px-3.5 text-sm";

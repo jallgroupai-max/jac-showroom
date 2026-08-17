@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteScenario } from "./actions";
+import { deleteScenario } from "@/lib/admin/api";
 
 // Borrado con guarda: el primer intento sin force — si el escenario está en
 // uso, el servidor devuelve el impacto y aquí se pide la confirmación

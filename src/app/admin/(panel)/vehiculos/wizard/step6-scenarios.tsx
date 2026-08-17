@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toggleVehicleScenario, saveOwnBackground, removeOwnBackground } from "../actions";
+import { toggleVehicleScenario, saveOwnBackground, removeOwnBackground } from "@/lib/admin/api";
 import { CreateScenarioModal } from "../../escenarios/create-scenario-modal";
 
 // Paso 6 — Escenarios de fondo (Req 8, prototipo "Escenarios de fondo"):
