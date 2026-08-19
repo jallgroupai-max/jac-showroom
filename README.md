@@ -17,15 +17,46 @@ El worker (`worker/index.mjs`) es un proceso Node aparte de Next que procesa en 
 
 Variables en `.env` (ver `.env.example`): `DATABASE_URL`, `AUTH_SECRET`, credenciales del seed (`SEED_ADMIN_*`). Seed inicial: `npm run db:migrate && npm run db:seed`.
 
-## Despliegue con Docker
+## Despliegue con Docker (VPS)
 
-`docker compose up -d --build` levanta los tres servicios:
+```bash
+docker compose --env-file environments/.env up -d --build
+```
 
-- **postgres** — base de datos (volumen `pgdata`).
-- **showroom** — la web Next.js en modo standalone (puerto `${PORT:-3000}`).
-- **worker** — misma imagen base construida con `target: worker` (etapa propia del `Dockerfile`); procesa los ZIP y la purga. Sin este servicio las subidas del paso 3 no se procesan.
+En el VPS lo lanza `deploy_main.sh`, que hace el `git pull` y esto. El `.env`
+vive en `environments/`, no en la raíz: sin `--env-file` los `${...}` del
+compose quedan sin resolver.
 
-`showroom` y `worker` comparten el volumen `uploads` montado en `/app/uploads-data`: la web guarda ahí lo que se sube desde el panel y el worker escribe los sprites procesados que la web luego sirve vía `/uploads/*`. La `DATABASE_URL` interna apunta al host `postgres` de la red de compose; `AUTH_SECRET` es obligatoria y se toma de `.env` (compose falla con un mensaje claro si falta).
+Servicios:
+
+- **migrate** → **seed** → **seed-catalog** — jobs de un solo uso, encadenados
+  con `depends_on: service_completed_successfully` e idempotentes.
+- **showroom** — la web Next.js en modo standalone. Espera solo a `migrate`.
+- **worker** — misma imagen base construida con `target: worker`; consume la
+  cola pg-boss `color-zip` y corre la purga diaria. **Sin este servicio las
+  subidas del paso 3 se quedan en QUEUED para siempre.**
+
+Postgres es externo (`DATABASE_URL` + red `showroom_network`), no lo levanta
+este compose. `showroom` y `worker` comparten el volumen `uploads_data` en
+`/app/uploads-data`: en modo disco local la web escribe ahí el ZIP y el worker
+lo lee (mismo uid 1001 en las dos imágenes). Con `S3_*` definidas, ese volumen
+solo se usa como scratch de extracción.
+
+### nginx: obligatorio para que las subidas 360° funcionen
+
+`client_max_body_size` vale **1 MB** por defecto en nginx, así que rechaza los
+ZIP con un 413 antes de que lleguen al contenedor. Hay que aplicar el
+fragmento de [`deploy/nginx-showroom.conf.example`](deploy/nginx-showroom.conf.example)
+— sube el límite y, sobre todo, activa `proxy_request_buffering off` para que
+nginx no acumule el archivo entero en su propio disco.
+
+### Recursos del worker
+
+Comprimir 36 fotogramas en tres calidades satura CPU, y en el VPS el worker
+comparte host con la web. `WORKER_CPUS`, `WORKER_MEMORY` y
+`WORKER_SHARP_CONCURRENCY` (ver `environments/.env.example`) acotan cuánta
+máquina puede llevarse mientras procesa. Con cores de sobra, subirlos acelera
+las subidas.
 
 ## Estado del proyecto
 

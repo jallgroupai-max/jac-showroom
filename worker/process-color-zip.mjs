@@ -22,6 +22,17 @@ import {
 // archivos de entrada quedan bloqueados (EBUSY) al intentar borrarlos.
 sharp.cache(false);
 
+// libvips abre por defecto UN HILO POR CORE del host. En el VPS, donde el
+// worker comparte máquina con el contenedor que sirve el showroom público,
+// procesar un color se lleva la CPU entera y el sitio deja de responder
+// varios minutos. SHARP_CONCURRENCY acota ese paralelismo; sin definir (o 0)
+// se queda con el default de sharp, que es lo correcto en Railway, donde el
+// worker es un servicio con recursos propios y no compite con nadie.
+const sharpConcurrency = Number(process.env.SHARP_CONCURRENCY ?? 0);
+if (Number.isFinite(sharpConcurrency) && sharpConcurrency > 0) {
+  sharp.concurrency(sharpConcurrency);
+}
+
 // Targets calibrados contra recursos/QUALITYS (medidos: LOW 1806×925 ~40KB,
 // MEDIUM 2500×1281 ~79KB, HIGH 2500×1281 ~142KB). HIGH y MEDIUM comparten
 // resolución — cambia la compresión. ⚠️ Pesos de un prototipo (TRD §4.1):

@@ -1,0 +1,62 @@
+# nginx del VPS — fragmento MÍNIMO para que las subidas de ZIP 360° funcionen.
+#
+# Por qué existe este archivo: el arreglo del proxy de Next (los ZIP ya no se
+# truncan a 10MB) es necesario pero NO suficiente en el VPS. Delante del
+# contenedor hay un nginx que termina el TLS, y su `client_max_body_size`
+# vale 1 MB por defecto: rechaza el ZIP con 413 antes de que el request llegue
+# siquiera a Next. En Railway este problema no existe porque no hay nginx.
+#
+# Copiar dentro del `server { ... }` del panel y recargar:
+#   nginx -t && systemctl reload nginx
+
+# --- Subida de ZIP de 360°: sin límite de tamaño y en streaming ---------------
+# Esta ruta recibe archivos de 100 MB o más. El handler de Next los va
+# escribiendo al storage a medida que llegan, sin cargarlos en memoria — pero
+# eso solo sirve si nginx TAMPOCO los acumula.
+location /api/admin/uploads {
+    # 0 = sin tope. Un valor fijo (p. ej. 2g) también sirve; lo que no sirve
+    # es dejar el default de 1m.
+    client_max_body_size 0;
+
+    # EL AJUSTE CRÍTICO. Sin esto nginx se traga el ZIP entero en SU disco
+    # (/var/lib/nginx/body) antes de reenviar una sola línea al contenedor:
+    # duplica el tiempo de subida, se come disco del host en cada intento y
+    # anula el streaming del backend. Es el mismo error conceptual que hacía
+    # el proxy de Next.
+    proxy_request_buffering off;
+
+    # Una subida grande por una conexión lenta tarda. Estos timeouts se
+    # cuentan entre paquetes, no sobre el total, pero el default de 60s se
+    # queda corto si la línea se degrada a mitad de camino.
+    client_body_timeout 600s;
+    proxy_read_timeout 600s;
+    proxy_send_timeout 600s;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    # Auth.js deriva el host de estas cabeceras (AUTH_TRUST_HOST=true).
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Puerto publicado del contenedor showroom (PORT_WEB en environments/.env).
+    proxy_pass http://127.0.0.1:4000;
+}
+
+# --- Resto de la app ----------------------------------------------------------
+location / {
+    # Los sprites 360° procesados se sirven por /uploads/*; son muchos
+    # archivos pequeños, aquí el buffering por defecto está bien.
+    client_max_body_size 25m;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    proxy_pass http://127.0.0.1:4000;
+}
+
+# Si delante de nginx hay un WAF, revisar que no tenga su propio tope de
+# tamaño de cuerpo: suelen venir bajos y no siempre lo dicen en el error.

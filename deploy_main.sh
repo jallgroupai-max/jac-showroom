@@ -8,6 +8,7 @@ GITHUB_USER="Corporacion-bel"
 GITHUB_REPO="jac-vzla-showroom360"
 COMPOSE_FILE="docker-compose.yml"
 CONTAINER_NAME="jac-showroom"
+WORKER_CONTAINER_NAME="jac-showroom-worker"
 IMAGE_NAME="jac-showroom:latest"
 CLAVE_SSH_NAME="github-deploy-showroom"
 ENV_PATH="$PROJECT_PATH/environments/.env"
@@ -89,18 +90,42 @@ fi
 echo "[4/4] Verificando estado..."
 sleep 5
 
-# Verificar si el contenedor está corriendo
-if docker ps | grep -q $CONTAINER_NAME; then
+# Nombre EXACTO: `docker ps | grep jac-showroom` también casaba con
+# jac-showroom-worker, así que la web podía estar caída y el deploy reportar
+# éxito solo porque el worker seguía en pie.
+running() {
+    [ -n "$(docker ps --filter "name=^${1}$" --format '{{.Names}}')" ]
+}
+
+if running "$CONTAINER_NAME"; then
     echo "[OK] DESPLIEGUE EXITOSO"
     echo ""
     echo "[INFO] Informacion del contenedor:"
-    docker ps | grep $CONTAINER_NAME
+    docker ps --filter "name=^${CONTAINER_NAME}$"
     echo ""
     echo "[INFO] Ultimos logs:"
     docker logs --tail=20 $CONTAINER_NAME 2>/dev/null || echo "Esperando logs..."
     echo ""
-    echo "[INFO] Contenedor disponible en puerto 5522"
+
+    # El worker es un servicio APARTE (target: worker). Si no está arriba, la
+    # web funciona pero los ZIP de 360° se quedan en QUEUED para siempre y
+    # nadie se entera hasta que alguien mira el panel. No aborta el deploy
+    # —el sitio sirve igual— pero avisa fuerte.
+    echo "[INFO] Verificando worker de assets 360..."
+    if running "$WORKER_CONTAINER_NAME"; then
+        echo "[OK] $WORKER_CONTAINER_NAME corriendo"
+        docker logs --tail=10 $WORKER_CONTAINER_NAME 2>/dev/null
+        echo "[INFO] Debe decir: Worker de assets arriba - cola \"color-zip\", concurrencia 1."
+    else
+        echo "[WARN] $WORKER_CONTAINER_NAME NO esta corriendo."
+        echo "[WARN] Las subidas de ZIP 360 se quedaran encoladas sin procesar."
+        echo "[WARN] Logs del worker:"
+        docker logs --tail=30 $WORKER_CONTAINER_NAME 2>/dev/null || echo "(el contenedor ni siquiera existe)"
+    fi
+
+    echo ""
     echo "[INFO] Para ver mas logs: docker logs -f $CONTAINER_NAME"
+    echo "[INFO] Logs del worker:   docker logs -f $WORKER_CONTAINER_NAME"
     exit 0
 else
     echo "[ERROR] El contenedor no esta corriendo"

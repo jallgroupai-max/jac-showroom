@@ -94,6 +94,30 @@ services:
       - S3_BUCKET=${S3_BUCKET:-}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+      # libvips (el motor de sharp) abre por defecto UN HILO POR CORE del
+      # host. En el VPS, donde worker y showroom comparten la misma máquina,
+      # eso significa que comprimir 36 fotogramas × 3 calidades se lleva la
+      # CPU entera y el sitio deja de responder varios minutos. Acotarlo es
+      # LA diferencia con Railway, donde el worker es un servicio con
+      # recursos propios y no compite con nadie. Lo aplica sharp.concurrency()
+      # en process-color-zip.mjs; 0 o sin definir = default de sharp.
+      - SHARP_CONCURRENCY=${WORKER_SHARP_CONCURRENCY:-2}
+      # zlib (unzipper) y fs corren en el threadpool de libuv, no en el hilo
+      # de JS — mismo motivo para acotarlo.
+      - UV_THREADPOOL_SIZE=${WORKER_UV_THREADPOOL_SIZE:-4}
+    # Techo DURO, por si lo de arriba se queda corto: aunque el worker se
+    # descontrole, no puede dejar sin CPU ni sin RAM al contenedor que sirve
+    # el showroom público. Subir WORKER_CPUS si el VPS tiene cores de sobra
+    # y las subidas se sienten lentas.
+    cpus: ${WORKER_CPUS:-1.5}
+    mem_limit: ${WORKER_MEMORY:-1g}
+    # Sin esto el log del worker crece sin límite en /var/lib/docker y llena
+    # el disco del VPS (en Railway lo rota la plataforma).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -133,7 +157,11 @@ services:
       - showroom_volume:/app/data
       - uploads_data:/app/uploads-data
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${PORT_WEB:-4000}/"]
+      # Puerto INTERNO (el runner arranca con PORT=3000), no PORT_WEB: éste
+      # corre DENTRO del contenedor, donde el mapeo de `ports` no existe.
+      # Apuntando a 4000 el healthcheck fallaba siempre y el contenedor
+      # quedaba marcado unhealthy con la web funcionando perfectamente.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3
