@@ -57,6 +57,13 @@ export function Step3Gallery({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceForRef = useRef<string | null>(null);
 
+  // Un .zip a la vez: mientras uno se está transfiriendo no se puede elegir
+  // otro. No bloquea la COLA —encolar cinco colores es normal (§2.3)— solo la
+  // transferencia: dos subidas de 100MB+ en paralelo se reparten el mismo
+  // ancho de banda y ninguna acaba antes. En cuanto el archivo termina de
+  // subir y el job queda encolado, la zona vuelve a habilitarse.
+  const isUploading = pending !== null && pending.uploadPercent !== null;
+
   // — Polling de jobs activos (plan §2.3 paso 4). Un solo intervalo para
   //   todas las filas; se corta solo cuando no queda nada procesándose.
   const activeJobIds = Object.values(jobs)
@@ -85,6 +92,9 @@ export function Step3Gallery({
 
   // — Selección de archivo (alta nueva o reemplazo).
   const onFileChosen = useCallback((file: File, replaceColorId: string | null) => {
+    // Última barrera del cliente: cubre a la vez el input, el drag & drop y el
+    // botón "Reemplazar archivo", sin repetir la condición en cada uno.
+    if (isUploading) return;
     const replaced = replaceColorId ? colors.find((c) => c.id === replaceColorId) : null;
     setPending({
       file,
@@ -95,7 +105,7 @@ export function Step3Gallery({
       error: null,
     });
      
-  }, [colors]);
+  }, [colors, isUploading]);
 
   // — Subir + confirmar (§2.3 pasos 1-2): XHR para tener progreso real de
   //   subida; luego POST confirma y encola.
@@ -196,7 +206,12 @@ export function Step3Gallery({
 
       {/* Dropzone */}
       <label
-        className="flex cursor-pointer flex-col items-center gap-3 rounded-[18px] border-[1.5px] border-dashed border-[#cfcfcf] bg-[var(--adm-surface-soft)] p-[38px] hover:border-black hover:bg-white"
+        aria-disabled={isUploading}
+        className={`flex flex-col items-center gap-3 rounded-[18px] border-[1.5px] border-dashed border-[#cfcfcf] bg-[var(--adm-surface-soft)] p-[38px] ${
+          isUploading
+            ? "pointer-events-none opacity-50"
+            : "cursor-pointer hover:border-black hover:bg-white"
+        }`}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -209,7 +224,9 @@ export function Step3Gallery({
         </svg>
         <span className="text-[15px] font-semibold">Arrastra el .zip o haz clic para seleccionar</span>
         <span className="text-[12.5px] text-[var(--adm-faint)]">
-          ZIP · 36 archivos .png o .jpg nombrados 001–036 · un solo color por archivo
+          {isUploading
+            ? "Hay una subida en curso — espera a que termine para subir otro .zip"
+            : "ZIP · 36 archivos .png o .jpg nombrados 001–036 · un solo color por archivo"}
         </span>
         <input
           ref={fileInputRef}
@@ -397,11 +414,12 @@ export function Step3Gallery({
                       ) : null}
                       <button
                         type="button"
+                        disabled={isUploading}
                         onClick={() => {
                           replaceForRef.current = color.id;
                           fileInputRef.current?.click();
                         }}
-                        className="h-8 cursor-pointer rounded-full bg-black px-3.5 text-xs font-semibold text-white hover:bg-[var(--adm-hover)]"
+                        className="h-8 cursor-pointer rounded-full bg-black px-3.5 text-xs font-semibold text-white hover:bg-[var(--adm-hover)] disabled:cursor-default disabled:opacity-40"
                       >
                         Reemplazar archivo
                       </button>
