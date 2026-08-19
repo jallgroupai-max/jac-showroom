@@ -69,7 +69,7 @@ enum HotspotGroup {
 
 model HotspotIcon {
   id    String       @id @default(cuid())
-  key   String       @unique // "motor", "rines", "diesel"...
+  key   String       @unique // "motor", "rines", "gasolina"...
   label String
   group HotspotGroup
   // Path SVG (atributo `d`, viewBox 24×24, stroke) — así es como el prototipo

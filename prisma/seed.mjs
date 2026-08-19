@@ -85,7 +85,7 @@ const HOTSPOT_ICONS = [
   { key: "clima", label: "Clima", group: "INTERIOR", assetName: "inside_temparetaure", svgPath: "M12 3v18M4.5 7.5l15 9M19.5 7.5l-15 9" },
   { key: "audio", label: "Audio", group: "INTERIOR", assetName: "connectivity", svgPath: "M4 9.5h3.5L12 5.5v13L7.5 14.5H4zM16 9.5a4 4 0 010 5" },
   { key: "techo", label: "Techo", group: "INTERIOR", assetName: "inside_quemacoco", svgPath: "M4 7.5h16v9H4zM7 10h10v4H7z" },
-  { key: "diesel-car", label: "Diésel", group: "GENERAL", assetName: "diesel-car", svgPath: "M6 20V6a2 2 0 012-2h6a2 2 0 012 2v14M6 20h10M6 11h10M16 8l3 3v6a1.5 1.5 0 01-3 0" },
+  { key: "gasolina-car", label: "Gasolina", group: "GENERAL", assetName: "gasolina-car", svgPath: "M6 20V6a2 2 0 012-2h6a2 2 0 012 2v14M6 20h10M6 11h10M16 8l3 3v6a1.5 1.5 0 01-3 0" },
   { key: "gasoil-car", label: "Gasoil", group: "GENERAL", assetName: "gasoil-car", svgPath: "M7 20V5.5a1.5 1.5 0 011.5-1.5h5A1.5 1.5 0 0115 5.5V20M5 20h12M9.5 7.5h3.5" },
   { key: "electric-car", label: "Eléctrico", group: "GENERAL", assetName: "electric-car", svgPath: "M13 3L5 13.5h5L9.5 21l8-10.5h-5z" },
   { key: "4x4-car", label: "4×4", group: "GENERAL", assetName: "4x4-car", svgPath: "M2 16h20M4 16v-4h5l2-3h4l2 3h3v4M7.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3M16.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3" },

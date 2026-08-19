@@ -15,7 +15,7 @@ const prisma = new PrismaClient({ adapter });
 // El path 24×24 es solo para el picker del panel; el público usa el archivo.
 const MOCK_ICONS = [
   { key: "gasoil-car", label: "Gasoil", group: "GENERAL", svgPath: "M7 20V5.5a1.5 1.5 0 011.5-1.5h5A1.5 1.5 0 0115 5.5V20M5 20h12M9.5 7.5h3.5" },
-  { key: "diesel-car", label: "Diésel", group: "GENERAL", svgPath: "M6 20V6a2 2 0 012-2h6a2 2 0 012 2v14M6 20h10M6 11h10M16 8l3 3v6a1.5 1.5 0 01-3 0" },
+  { key: "gasolina-car", label: "Gasolina", group: "GENERAL", svgPath: "M6 20V6a2 2 0 012-2h6a2 2 0 012 2v14M6 20h10M6 11h10M16 8l3 3v6a1.5 1.5 0 01-3 0" },
   { key: "4x4-car", label: "4×4", group: "GENERAL", svgPath: "M2 16h20M4 16v-4h5l2-3h4l2 3h3v4M7.5 18a1.5 1.5 0 100-3M16.5 18a1.5 1.5 0 100-3" },
   { key: "electric-car", label: "Eléctrico", group: "GENERAL", svgPath: "M13 3L5 13.5h5L9.5 21l8-10.5h-5z" },
   { key: "outside_motors", label: "Motor", group: "EXTERIOR", svgPath: "M4 10.5h3V8.5h4l2 2h3.5v5H4zM7 15.5v1.5M17 12.5h2.5" },
@@ -80,8 +80,8 @@ const VEHICLES = [
   { slug: "savanna", commercialName: "SAVANNA", technicalName: "SAVANNA", trimLabel: "SUV", typeTag: "SUV · Automático", category: "suv", order: 4, featureIcons: ["gasoil-car"], colors: ["Negro"], cardImageUrl: "/assets/vehicles/savanna.webp" },
   { slug: "arena-pro", commercialName: "ARENA PRO", technicalName: "ARENA PRO", trimLabel: "SUV", typeTag: "SUV · Automático", category: "suv", order: 5, featureIcons: ["gasoil-car"], colors: ["Blanco"], cardImageUrl: "/assets/vehicles/arena-pro.webp" },
   { slug: "arena-jac-sport", commercialName: "Arena Jac Sport", technicalName: "Arena Jac Sport", trimLabel: "AT", typeTag: "SUV · AT", category: "suv", order: 6, featureIcons: ["gasoil-car"], colors: ["Negro"], cardImageUrl: "/assets/vehicles/arena-jac-sport.webp" },
-  { slug: "la-venezolana-pro", commercialName: "La Venezolana Pro", technicalName: "La Venezolana Pro", trimLabel: "4×4", typeTag: "Pickup · 4×4", category: "pickups", order: 7, featureIcons: ["4x4-car", "diesel-car"], colors: ["Azul"], cardImageUrl: "/assets/vehicles/la-venezolana-pro.webp" },
-  { slug: "sunray-v6-carga", commercialName: "SUNRAY V6 CARGA", technicalName: "SUNRAY V6 CARGA", trimLabel: "Carga", typeTag: "Comercial · Carga", category: "comercial", order: 8, featureIcons: ["diesel-car"], colors: ["Blanco"], cardImageUrl: "/assets/vehicles/sunray-v6-carga.webp" },
+  { slug: "la-venezolana-pro", commercialName: "La Venezolana Pro", technicalName: "La Venezolana Pro", trimLabel: "4×4", typeTag: "Pickup · 4×4", category: "pickups", order: 7, featureIcons: ["4x4-car", "gasolina-car"], colors: ["Azul"], cardImageUrl: "/assets/vehicles/la-venezolana-pro.webp" },
+  { slug: "sunray-v6-carga", commercialName: "SUNRAY V6 CARGA", technicalName: "SUNRAY V6 CARGA", trimLabel: "Carga", typeTag: "Comercial · Carga", category: "comercial", order: 8, featureIcons: ["gasolina-car"], colors: ["Blanco"], cardImageUrl: "/assets/vehicles/sunray-v6-carga.webp" },
 ];
 
 const COLOR_SLUGS = { Blanco: "blanco", Negro: "negro", Azul: "azul", Rojo: "rojo" };

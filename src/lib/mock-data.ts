@@ -301,7 +301,7 @@ export const VEHICLES: Vehicle[] = [
     categorySlug: "pickups",
     order: 0,
     // Combinación de tipos: 4x4 + diésel.
-    featureIcons: ["4x4-car", "diesel-car"],
+    featureIcons: ["4x4-car", "gasolina-car"],
     colors: [{ name: "Azul", hex: BODY_COLORS.Azul }],
     cardImageUrl: "/assets/vehicles/la-venezolana-pro.webp",
   }),
@@ -314,7 +314,7 @@ export const VEHICLES: Vehicle[] = [
     typeTag: "Comercial · Carga",
     categorySlug: "comercial",
     order: 0,
-    featureIcons: ["diesel-car"],
+    featureIcons: ["gasolina-car"],
     colors: [{ name: "Blanco", hex: BODY_COLORS.Blanco }],
     cardImageUrl: "/assets/vehicles/sunray-v6-carga.webp",
   }),
