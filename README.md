@@ -50,6 +50,20 @@ fragmento de [`deploy/nginx-showroom.conf.example`](deploy/nginx-showroom.conf.e
 — sube el límite y, sobre todo, activa `proxy_request_buffering off` para que
 nginx no acumule el archivo entero en su propio disco.
 
+### Verificar que el worker quedó arriba
+
+```bash
+bash deploy/check-worker.sh
+```
+
+Comprueba `jac-showroom` y `jac-showroom-worker` por nombre exacto. Es el
+fallo silencioso de este sistema: si el worker no arranca, la web funciona
+igual y los ZIP se van acumulando en QUEUED sin que nadie se entere.
+
+`deploy_main.sh` no lo llama por defecto — ese script suele estar modificado
+localmente en cada host y tocarlo desde el repo bloquea su propio `git pull`.
+Añadir `bash deploy/check-worker.sh` al final del script local es opcional.
+
 ### Recursos del worker
 
 Comprimir 36 fotogramas en tres calidades satura CPU, y en el VPS el worker
