@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1
+# Imagen del WORKER de assets 360° para Railway.
+#
+# Por qué un Dockerfile aparte y no `target: worker` del Dockerfile principal:
+# Railway construye siempre la ÚLTIMA etapa del Dockerfile que se le indica —
+# no expone un `--target`. El Dockerfile de la raíz termina en `runner`
+# (Next), así que un servicio worker apuntando ahí levantaría otra copia de la
+# web. Este archivo se selecciona con la variable de servicio
+# RAILWAY_DOCKERFILE_PATH=Dockerfile.worker.
+#
+# Es el gemelo de la etapa `worker` del Dockerfile principal (que sigue siendo
+# la que usa docker compose en el VPS) — si cambia una, cambia la otra.
+
+# ---- deps: dependencias desde el lockfile ----
+# Mismo criterio que el Dockerfile principal: `npm install` y NO `npm ci`
+# (el lockfile viene de Windows y omite transitivas de bindings opcionales
+# de Linux, que `npm ci` rechaza con EUSAGE Missing).
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm install --no-audit --no-fund
+
+# ---- worker: pg-boss + unzipper + sharp ----
+FROM node:22-alpine AS worker
+WORKDIR /app
+ENV NODE_ENV=production
+# node_modules COMPLETO a propósito: el trace standalone de Next no incluye
+# las dependencias que solo usa el worker (unzipper, sharp, pg-boss).
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json prisma.config.ts ./
+COPY prisma ./prisma
+COPY worker ./worker
+# worker/index.mjs y process-color-zip.mjs importan ../src/lib/storage-engine.mjs
+# por ruta relativa (plain ESM, sin bundler). Sin esta copia el proceso muere
+# al arrancar con ERR_MODULE_NOT_FOUND.
+COPY src/lib/storage-engine.mjs ./src/lib/storage-engine.mjs
+# prisma.config.ts exige DATABASE_URL al cargarse; para generate basta un
+# placeholder — la URL real llega por variables del servicio en runtime.
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
+
+# uploads-data es el scratch del worker incluso en modo S3: ahí baja el ZIP
+# del bucket y extrae los 36 fotogramas antes de comprimirlos (disco efímero
+# del contenedor — nada que persistir, el resultado va al bucket). Se crea
+# aquí con el dueño correcto porque el proceso NO corre como root.
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs \
+  && mkdir -p uploads-data \
+  && chown nextjs:nodejs uploads-data
+USER nextjs
+
+# Sin EXPOSE ni healthcheck HTTP: el worker no escucha en ningún puerto, vive
+# de la cola `color-zip` en Postgres. En Railway va SIN dominio público.
+CMD ["node", "worker/index.mjs"]

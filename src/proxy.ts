@@ -63,5 +63,14 @@ function withNoindex(response: NextResponse) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  // /api/admin/uploads queda FUERA a propósito. Cuando existe un proxy, Next
+  // 16 clona y bufferea en memoria el cuerpo de cada request que pasa por él,
+  // con el tope de `experimental.proxyClientMaxBodySize` (10MB por defecto):
+  // los ZIP de 360° se truncaban a 10MB y la conexión moría con ECONNRESET,
+  // así que el PUT nunca devolvía la clave y no se llegaba a crear el
+  // UploadJob. Subir ese tope no sirve — metería el ZIP entero en RAM y
+  // anularía el streaming a bucket de §2.5. Excluirla lo deja pasar directo,
+  // sin límite de tamaño. La ruta NO queda desprotegida: su handler llama a
+  // requireAdminUser() como primera línea y aplica su propio rate limit.
+  matcher: ["/admin/:path*", "/api/admin/((?!uploads).*)"],
 };

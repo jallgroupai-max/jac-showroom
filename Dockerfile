@@ -44,6 +44,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY worker ./worker
+# worker/index.mjs y process-color-zip.mjs importan ../src/lib/storage-engine.mjs
+# por ruta relativa (plain ESM, sin bundler). Sin esta copia el proceso muere
+# al arrancar con ERR_MODULE_NOT_FOUND.
+COPY src/lib/storage-engine.mjs ./src/lib/storage-engine.mjs
 # prisma.config.ts exige DATABASE_URL al cargarse; para generate basta un
 # placeholder — la URL real llega por environment en runtime (compose).
 RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate

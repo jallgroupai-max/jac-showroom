@@ -66,6 +66,42 @@ services:
       - showroom_network
     restart: "no"
 
+  # Worker de assets 360°: consume la cola pg-boss "color-zip" (mismo
+  # Postgres) y corre la purga diaria de archivados. Es un proceso Node
+  # APARTE de Next a propósito — descomprimir el ZIP y derivar los 36
+  # fotogramas en tres calidades satura CPU y no cabe en un request.
+  #
+  # Sin este servicio la subida "funciona" pero el UploadJob se queda en
+  # QUEUED para siempre: nadie consume la cola.
+  #
+  # Monta el MISMO volumen uploads_data que showroom: en modo disco local el
+  # ZIP que escribe la web tiene que poder leerlo el worker (mismo uid 1001
+  # en ambas imágenes). En modo S3 lo usa solo como scratch de extracción.
+  worker:
+    build:
+      context: .
+      target: worker
+    image: jac-showroom-worker:latest
+    container_name: jac-showroom-worker
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - ARCHIVE_GRACE_DAYS=${ARCHIVE_GRACE_DAYS:-30}
+      # Modo dual de storage: las cuatro o ninguna (storage-engine.mjs aborta
+      # si hay una configuración S3 a medias).
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_REGION=${S3_REGION:-}
+      - S3_BUCKET=${S3_BUCKET:-}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - showroom_network
+    volumes:
+      - uploads_data:/app/uploads-data
+
   showroom:
     build: .
     image: jac-showroom:latest
