@@ -55,7 +55,7 @@ if [ -f "$ENV_PATH" ]; then
 
     # Mostrar variables de entorno (ocultando valores sensibles)
     echo "[INFO] Variables de entorno cargadas:"
-    grep -E "^(POSTGRES_|DATABASE_|DB_|NODE_|PORT|JWT_)" "$ENV_PATH" | cut -d'=' -f1 | sed 's/.*/  - &/'
+    grep -E "^(POSTGRES_|DATABASE_|DB_|NODE_|PORT|JWT_|ODOO_)" "$ENV_PATH" | cut -d'=' -f1 | sed 's/.*/  - &/'
 else
     echo "[ERROR] No se encontró archivo .env en $ENV_PATH"
     echo "[ERROR] El despliegue no puede continuar sin variables de entorno"

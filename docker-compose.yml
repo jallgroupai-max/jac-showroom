@@ -146,6 +146,20 @@ services:
       # Ambas ya existían en environments/.env; faltaba pasarlas al contenedor.
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
+      # CRM Odoo (JSON-RPC, src/lib/crm.ts). Solo las necesita ESTE servicio:
+      # el envío ocurre en /api/leads y en el reintento manual de /admin/leads,
+      # ambos dentro de Next. El worker no habla con el CRM.
+      #
+      # ODOO_ENABLED actúa de interruptor: en false el envío usa el mock y no
+      # sale tráfico al CRM. Los defaults dejan el sitio arriba aunque falten
+      # en environments/.env — sin ellos, `up` aborta por variable no resuelta
+      # y tumba un deploy que nada tiene que ver con Odoo.
+      - ODOO_ENABLED=${ODOO_ENABLED:-false}
+      - ODOO_URL=${ODOO_URL:-}
+      - ODOO_DB=${ODOO_DB:-}
+      - ODOO_USER=${ODOO_USER:-}
+      - ODOO_API_KEY=${ODOO_API_KEY:-}
+      - ODOO_TEAM_ID=${ODOO_TEAM_ID:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

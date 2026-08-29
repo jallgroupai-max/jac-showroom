@@ -110,6 +110,10 @@ export function retryLeadSync(leadId: string): Promise<ActionResult> {
   return post("/api/admin/leads/retry", { leadId });
 }
 
+export function deleteLead(leadId: string): Promise<ActionResult> {
+  return post("/api/admin/leads/delete", { leadId });
+}
+
 // ————————————————————————————————————————————————————————————————
 // Vehículos
 // ————————————————————————————————————————————————————————————————

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { RetryLeadButton } from "./retry-button";
+import { DeleteLeadButton } from "./delete-button";
 
 // Bandeja de leads (plan A6) — el showroom los persiste ANTES de intentar el
 // CRM (TRD §6.2) y hasta ahora nadie tenía dónde verlos. Filtro por estado
@@ -16,6 +17,36 @@ const STATUS_FILTERS = [
 
 const CHANNEL_LABEL: Record<string, string> = { WHATSAPP: "WhatsApp", CALL: "Llamada", EMAIL: "Correo" };
 const STATUS_LABEL: Record<string, string> = { SENT: "Enviado", FAILED: "Fallido", PENDING: "Pendiente" };
+
+// Estado de sincronización con Odoo, de un vistazo: check verde cuando la
+// oportunidad existe en el CRM, equis roja cuando no. El id de `crm.lead` va
+// al lado del check porque es la única prueba verificable del envío — con él
+// se abre la oportunidad en Odoo; sin él, "Enviado" es solo una promesa.
+//
+// Los leads anteriores a esta columna quedaron SENT sin id (el CRM era un
+// mock): se marcan como "sin id" en vez de fingir que están confirmados.
+function SyncCell({ status, odooLeadId, attempts }: { status: string; odooLeadId: number | null; attempts: number }) {
+  const sent = status === "SENT";
+  return (
+    <div className="flex items-center gap-2">
+      {sent ? (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" fill="#067647" />
+          <path d="M7.5 12.4l3 3 6-6.4" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" fill="#b42318" />
+          <path d="M8.6 8.6l6.8 6.8M15.4 8.6l-6.8 6.8" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      )}
+      <span className={`text-[12px] font-semibold ${sent ? "text-[#067647]" : "text-[#b42318]"}`}>
+        {sent ? (odooLeadId ? `Odoo #${odooLeadId}` : "Enviado · sin id") : STATUS_LABEL[status]}
+        {!sent && attempts > 1 ? ` ·${attempts}` : ""}
+      </span>
+    </div>
+  );
+}
 
 export default async function LeadsPage({
   searchParams,
@@ -158,21 +189,17 @@ export default async function LeadsPage({
                   <td className="px-4 py-3">{lead.wantsTestDrive ? "Sí" : "No"}</td>
                   <td className="px-4 py-3 capitalize">{lead.origin.toLowerCase()}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-[0.04em] ${
-                        lead.syncStatus === "SENT"
-                          ? "bg-black text-white"
-                          : lead.syncStatus === "FAILED"
-                            ? "bg-[#fef3f2] text-[#b42318]"
-                            : "border border-[var(--adm-border-input)] text-[var(--adm-faint)]"
-                      }`}
-                    >
-                      {STATUS_LABEL[lead.syncStatus]}
-                      {lead.syncAttempts > 1 ? ` ·${lead.syncAttempts}` : ""}
-                    </span>
+                    <SyncCell
+                      status={lead.syncStatus}
+                      odooLeadId={lead.odooLeadId}
+                      attempts={lead.syncAttempts}
+                    />
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    {lead.syncStatus !== "SENT" ? <RetryLeadButton leadId={lead.id} /> : null}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {lead.syncStatus !== "SENT" ? <RetryLeadButton leadId={lead.id} /> : null}
+                      <DeleteLeadButton leadId={lead.id} fullName={lead.fullName} />
+                    </div>
                   </td>
                 </tr>
               ))}

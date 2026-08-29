@@ -386,6 +386,9 @@ model Lead {
   origin                LeadOrigin
   syncStatus            LeadSyncStatus @default(PENDING)
   syncAttempts          Int            @default(0)
+  /// Id de la oportunidad creada en Odoo (crm.lead). Null mientras el lead
+  /// no se sincronice: es la prueba de que el envío ocurrió.
+  odooLeadId            Int?
   createdAt             DateTime       @default(now())
 
   @@index([syncStatus, createdAt])

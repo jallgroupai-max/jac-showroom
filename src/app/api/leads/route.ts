@@ -8,8 +8,8 @@ import { rateLimit, clientIp } from "@/lib/rate-limit";
 // el lead se guarda en la DB ANTES de intentar el CRM; el resultado del envío
 // queda en syncStatus y la bandeja del panel (/admin/leads) permite
 // reintentar los fallidos. "Funcional primero, integrar después": el envío a
-// Odoo sigue siendo un mock — reemplazar `sendToOdooMock` por la integración
-// real cuando llegue el endpoint (Fase 4 del plan público), sin tocar nada más.
+// Odoo ya es REAL (src/lib/crm.ts + src/lib/odoo.ts); el interruptor
+// ODOO_ENABLED permite apagarlo sin desplegar código.
 
 const leadSchema = z.object({
   fullName: z.string().trim().min(1).max(120),
@@ -84,15 +84,19 @@ export async function POST(request: Request) {
   });
 
   let synced = false;
+  // El id de la oportunidad en Odoo es la PRUEBA de que el envío ocurrió: sin
+  // él, un "SENT" es solo una promesa. La bandeja del panel lo muestra.
+  let odooLeadId: number | null = null;
   try {
-    const odooResult = await sendLeadToCRM(lead);
+    const odooResult = await sendLeadToCRM({ ...lead, dealerCity: dealer.city });
     synced = odooResult.ok;
+    odooLeadId = odooResult.odooLeadId ?? null;
   } catch {
     synced = false;
   }
   await prisma.lead.update({
     where: { id: saved.id },
-    data: { syncStatus: synced ? "SENT" : "FAILED", syncAttempts: 1 },
+    data: { syncStatus: synced ? "SENT" : "FAILED", syncAttempts: 1, odooLeadId },
   });
 
   return NextResponse.json({ success: true, syncedToOdoo: synced });
