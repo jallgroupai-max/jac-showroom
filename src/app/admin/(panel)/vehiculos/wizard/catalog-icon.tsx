@@ -1,18 +1,23 @@
-// Ícono real de /assets/icons — el mismo archivo que sirve el showroom
-// público (HotspotIcon.assetName). Sin assetName, cae al path 24×24
-// abstracto (íconos creados desde el panel sin SVG de diseño todavía).
+// Dibujo de un ícono del catálogo, en el MISMO orden de prioridad que usa el
+// showroom público (iconRef en lib/data/catalog.ts):
+//   1. iconUrl   — SVG subido desde /admin/iconos;
+//   2. assetName — archivo real de /assets/icons (los del diseño original);
+//   3. svgPath   — path 24×24 abstracto de respaldo.
+// Que iconUrl gane es lo que permite reemplazar el dibujo de un ícono del
+// seed sin tocar los archivos del repo.
 export function HotspotIconImage({
   icon,
   size = 28,
 }: {
-  icon: { label: string; svgPath: string; assetName?: string | null };
+  icon: { label: string; svgPath: string; assetName?: string | null; iconUrl?: string | null };
   size?: number;
 }) {
-  if (!icon.assetName) return <CatalogIcon d={icon.svgPath} size={size * 0.75} />;
+  const src = icon.iconUrl ?? (icon.assetName ? `/assets/icons/${icon.assetName}.svg` : null);
+  if (!src) return <CatalogIcon d={icon.svgPath} size={size * 0.75} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/assets/icons/${icon.assetName}.svg`}
+      src={src}
       alt=""
       width={size}
       height={size}
@@ -46,6 +51,47 @@ export function CatalogIcon({
     >
       <path d={d} />
     </svg>
+  );
+}
+
+// Ícono de una categoría: el SVG que subió el admin si lo hay, y si no la
+// silueta estática por slug — así las cuatro categorías del seed (que nunca
+// subieron nada) siguen viéndose exactamente igual que antes.
+export function CategoryIcon({
+  category,
+  size = 34,
+  strokeWidth = 1.4,
+  inverted = false,
+}: {
+  category: { slug: string; iconUrl?: string | null };
+  size?: number;
+  strokeWidth?: number;
+  /** Sobre fondo oscuro (tarjeta de categoría activa). La silueta estática
+   * usa currentColor y se adapta sola; el SVG subido no, así que se invierte
+   * — un ícono negro sobre la tarjeta negra sería invisible. */
+  inverted?: boolean;
+}) {
+  if (category.iconUrl) {
+    return (
+      /* SVG de tamaño fijo servido por /uploads: next/image no aporta nada
+         sobre un vector. */
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={category.iconUrl}
+        alt=""
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+        className={inverted ? "object-contain invert" : "object-contain"}
+      />
+    );
+  }
+  return (
+    <CatalogIcon
+      d={CATEGORY_ICON_PATHS[category.slug] ?? FALLBACK_CATEGORY_PATH}
+      size={size}
+      strokeWidth={strokeWidth}
+    />
   );
 }
 

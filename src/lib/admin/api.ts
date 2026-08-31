@@ -103,6 +103,48 @@ export function deleteScenario(scenarioId: string, force: boolean): Promise<Acti
 }
 
 // ————————————————————————————————————————————————————————————————
+// Categorías de vehículo
+// ————————————————————————————————————————————————————————————————
+
+export async function createCategory(formData: FormData): Promise<ActionResult> {
+  return post("/api/admin/categories/create", await toJson(formData));
+}
+
+export async function updateCategory(
+  categoryId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  return post("/api/admin/categories/update", { ...(await toJson(formData)), categoryId });
+}
+
+export function deleteCategory(categoryId: string): Promise<ActionResult> {
+  return post("/api/admin/categories/delete", { categoryId });
+}
+
+export function moveCategory(categoryId: string, direction: "up" | "down"): Promise<ActionResult> {
+  return post("/api/admin/categories/move", { categoryId, direction });
+}
+
+// ————————————————————————————————————————————————————————————————
+// Catálogo de íconos (exterior / interior / general)
+// ————————————————————————————————————————————————————————————————
+
+export async function createHotspotIcon(formData: FormData): Promise<ActionResult> {
+  return post("/api/admin/icons/create", await toJson(formData));
+}
+
+export async function updateHotspotIcon(
+  iconId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  return post("/api/admin/icons/update", { ...(await toJson(formData)), iconId });
+}
+
+export function deleteHotspotIcon(iconId: string): Promise<ActionResult> {
+  return post("/api/admin/icons/delete", { iconId });
+}
+
+// ————————————————————————————————————————————————————————————————
 // Leads
 // ————————————————————————————————————————————————————————————————
 

@@ -91,7 +91,9 @@ async function main() {
   for (const [order, icon] of MOCK_ICONS.entries()) {
     await prisma.hotspotIcon.upsert({
       where: { key: icon.key },
-      update: { label: icon.label, group: icon.group, svgPath: icon.svgPath, assetName: icon.key },
+      // Ver seed.mjs: el catálogo de íconos es editable desde /admin/iconos,
+      // así que un ícono ya existente no se sobrescribe.
+      update: {},
       create: { ...icon, assetName: icon.key, order: 100 + order },
     });
   }

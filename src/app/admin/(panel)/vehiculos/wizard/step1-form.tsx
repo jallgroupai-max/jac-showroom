@@ -1,16 +1,30 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { vehicleBasicsSchema, type VehicleBasicsInput } from "@/lib/admin/schemas";
 import { slugify } from "@/lib/admin/slug";
 import { createVehicle, updateVehicleBasics, saveVehicleCardImage, removeVehicleCardImage } from "@/lib/admin/api";
-import { CatalogIcon, CATEGORY_ICON_PATHS, FALLBACK_CATEGORY_PATH, HotspotIconImage } from "./catalog-icon";
+import { CategoryIcon, HotspotIconImage } from "./catalog-icon";
 
-type CategoryOption = { id: string; slug: string; name: string; vehicleCount: number };
-type GeneralIconOption = { id: string; key: string; label: string; svgPath: string; assetName: string | null };
+type CategoryOption = {
+  id: string;
+  slug: string;
+  name: string;
+  iconUrl: string | null;
+  vehicleCount: number;
+};
+type GeneralIconOption = {
+  id: string;
+  key: string;
+  label: string;
+  svgPath: string;
+  assetName: string | null;
+  iconUrl: string | null;
+};
 
 export function Step1Form({
   categories,
@@ -198,6 +212,15 @@ export function Step1Form({
           <span className="text-[12.5px] text-[var(--adm-fainter)]">
             Determina la pestaña del selector público
           </span>
+          {/* El alta y la baja viven en su propia pantalla (el wizard no debe
+              editar un catálogo compartido a espaldas del resto), pero llegar
+              hasta ella desde aquí ahorra el rodeo por el header. */}
+          <Link
+            href="/admin/categorias"
+            className="ml-auto text-[12.5px] font-semibold text-black underline underline-offset-2 hover:text-[var(--adm-hover)]"
+          >
+            Gestionar categorías
+          </Link>
         </div>
         <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
           {categories.map((cat) => {
@@ -214,11 +237,7 @@ export function Step1Form({
                   isActive ? "border-black bg-black text-white" : "border-[#e0e0e0] bg-white text-black"
                 }`}
               >
-                <CatalogIcon
-                  d={CATEGORY_ICON_PATHS[cat.slug] ?? FALLBACK_CATEGORY_PATH}
-                  size={34}
-                  strokeWidth={1.4}
-                />
+                <CategoryIcon category={cat} size={34} inverted={isActive} />
                 <span className="text-[13.5px] font-semibold">{cat.name}</span>
                 <span className={isActive ? "text-[11.5px] text-white/60" : "text-[11.5px] text-[var(--adm-faint)]"}>
                   {cat.vehicleCount} {cat.vehicleCount === 1 ? "modelo" : "modelos"}
@@ -227,6 +246,17 @@ export function Step1Form({
             );
           })}
         </div>
+        {/* Sin categorías no hay vehículo posible (categoryId es obligatorio):
+            mejor decirlo que dejar una rejilla vacía y un error al guardar. */}
+        {categories.length === 0 ? (
+          <p className="rounded-2xl border-[1.5px] border-dashed border-[#cfcfcf] bg-[var(--adm-surface-soft)] p-[18px] text-[13px] text-[var(--adm-faint)]">
+            Todavía no hay categorías.{" "}
+            <Link href="/admin/categorias" className="font-semibold text-black underline underline-offset-2">
+              Crea la primera
+            </Link>{" "}
+            para poder guardar el vehículo.
+          </p>
+        ) : null}
         {errors.categoryId ? <span className={errorClass}>{errors.categoryId.message}</span> : null}
       </div>
 

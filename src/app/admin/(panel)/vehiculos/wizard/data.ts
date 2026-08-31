@@ -17,6 +17,7 @@ export async function getWizardFormData() {
       id: c.id,
       slug: c.slug,
       name: c.name,
+      iconUrl: c.iconUrl,
       vehicleCount: c._count.vehicles,
     })),
     icons: icons.map((i) => ({
@@ -26,6 +27,7 @@ export async function getWizardFormData() {
       group: i.group as string,
       svgPath: i.svgPath,
       assetName: i.assetName,
+      iconUrl: i.iconUrl,
     })),
   };
 }

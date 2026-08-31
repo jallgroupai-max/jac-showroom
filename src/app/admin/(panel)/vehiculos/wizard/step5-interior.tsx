@@ -37,6 +37,7 @@ export type InteriorIconOption = {
   label: string;
   svgPath: string;
   assetName: string | null;
+  iconUrl: string | null;
 };
 
 const BLINK_LABELS: Record<InteriorPoi["blink"], string> = {

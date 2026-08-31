@@ -55,6 +55,11 @@ model Category {
   slug     String    @unique
   name     String // "Sedán" — typeTag del showroom se DERIVA: `${name} · ${trimLabel}` (plan §1.9)
   order    Int       @default(0)
+  // SVG subido desde /admin/categorias. Null = silueta por slug del catálogo
+  // estático (CATEGORY_ICON_PATHS) — así las cuatro categorías del seed
+  // conservan su dibujo sin necesidad de resubirlo. Solo lo usa el PANEL:
+  // las pestañas del showroom público son de texto.
+  iconUrl  String?
   vehicles Vehicle[]
 }
 
@@ -73,13 +78,18 @@ model HotspotIcon {
   label String
   group HotspotGroup
   // Path SVG (atributo `d`, viewBox 24×24, stroke) — así es como el prototipo
-  // define sus íconos; un catálogo de paths evita gestionar archivos.
-  svgPath String
+  // define sus íconos; un catálogo de paths evita gestionar archivos. Vacío
+  // en los íconos creados desde /admin/iconos, que traen su SVG completo.
+  svgPath String @default("")
   // Nombre del SVG real en /assets/icons (recursos/Iconos) — el showroom
   // público validado pixel-a-pixel usa ESOS archivos. Con assetName, el
   // adapter público sirve el archivo real; sin él, cae a un data-URI del
   // svgPath (íconos creados desde el panel sin SVG de diseño todavía).
   assetName String?
+  // SVG subido desde /admin/iconos, servido por /uploads. Tiene PRIORIDAD
+  // sobre assetName: es lo que permite reemplazar el dibujo de un ícono del
+  // seed sin tocar los archivos de /public/assets/icons.
+  iconUrl   String?
   order     Int     @default(0)
   vehicleFeatures  VehicleFeatureIcon[]
   pointsOfInterest PointOfInterest[]

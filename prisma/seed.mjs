@@ -39,7 +39,11 @@ async function main() {
   for (const c of CATEGORIES) {
     await prisma.category.upsert({
       where: { slug: c.slug },
-      update: { name: c.name, order: c.order },
+      // Si la categoría ya existe no se la pisa: desde /admin/categorias el
+      // admin puede haberla renombrado, reordenado o cambiado el ícono, y el
+      // seed tiene que poder correrse en cualquier momento sin deshacerlo
+      // (mismo criterio que con la contraseña del AdminUser).
+      update: {},
       create: c,
     });
   }
@@ -55,13 +59,10 @@ async function main() {
   for (const [order, icon] of HOTSPOT_ICONS.entries()) {
     await prisma.hotspotIcon.upsert({
       where: { key: icon.key },
-      update: {
-        label: icon.label,
-        group: icon.group,
-        svgPath: icon.svgPath,
-        assetName: icon.assetName,
-        order,
-      },
+      // Si el ícono ya existe no se lo pisa: desde /admin/iconos el admin
+      // puede haberlo renombrado, cambiado de grupo o reemplazado el dibujo,
+      // y el seed tiene que poder correrse sin deshacerlo.
+      update: {},
       create: { ...icon, order },
     });
   }

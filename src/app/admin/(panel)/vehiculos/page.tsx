@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { updatedAgo } from "@/lib/admin/time";
-import { CatalogIcon, CATEGORY_ICON_PATHS, FALLBACK_CATEGORY_PATH } from "./wizard/catalog-icon";
+import { CategoryIcon } from "./wizard/catalog-icon";
 import { VehicleCardActions } from "./vehicle-card-actions";
 
 // Biblioteca de vehículos — 1:1 con el prototipo ("Vehículos cargados"):
@@ -135,11 +135,7 @@ export default async function VehiculosPage({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={v.cardImageUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <CatalogIcon
-                    d={CATEGORY_ICON_PATHS[v.category.slug] ?? FALLBACK_CATEGORY_PATH}
-                    size={30}
-                    strokeWidth={1.2}
-                  />
+                  <CategoryIcon category={v.category} size={30} strokeWidth={1.2} />
                 )}
                 <span
                   className={`absolute left-3 top-3 rounded-full px-[11px] py-[5px] text-[11px] font-bold tracking-[0.06em] ${

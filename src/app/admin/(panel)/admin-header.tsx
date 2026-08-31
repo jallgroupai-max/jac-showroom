@@ -9,6 +9,8 @@ import { logout } from "@/lib/admin/api";
 // sobre fondo #f4f4f4 (activa: negra), botón Salir. Sticky, 66px.
 const TABS = [
   { label: "Vehículos", href: "/admin/vehiculos" },
+  { label: "Categorías", href: "/admin/categorias" },
+  { label: "Íconos", href: "/admin/iconos" },
   { label: "Escenarios", href: "/admin/escenarios" },
   { label: "Leads", href: "/admin/leads" },
   { label: "Nuevo vehículo", href: "/admin/vehiculos/nuevo" },

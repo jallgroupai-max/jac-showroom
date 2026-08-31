@@ -14,7 +14,14 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",
+  ".svg": "image/svg+xml",
 };
+
+// Un SVG es un documento XML, no un píxel: navegado directo se ejecuta en
+// ESTE origen, con la sesión del panel. El contenido ya se limpia al subirlo
+// (lib/admin/svg-sanitize.ts); esta CSP es la segunda capa — nada de scripts,
+// nada de red — para que un fallo del saneador no baste por sí solo.
+const SVG_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path: segments } = await ctx.params;
@@ -42,6 +49,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ path: 
     "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
   };
   if (asset.contentLength !== null) headers["Content-Length"] = String(asset.contentLength);
+  if (contentType === "image/svg+xml") headers["Content-Security-Policy"] = SVG_CSP;
 
   return new Response(asset.stream, { headers });
 }

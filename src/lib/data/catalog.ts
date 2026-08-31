@@ -109,7 +109,7 @@ function toVehicleDTO(v: VehicleRow): VehicleDTO {
   const pointsOfInterest: PointOfInterest[] = v.pointsOfInterest.map((p) => ({
     id: p.id,
     mode: p.mode === "EXTERIOR" ? "exterior" : "interior",
-    icon: iconRef(p.icon.assetName, p.icon.svgPath),
+    icon: iconRef(p.icon.assetName, p.icon.svgPath, p.icon.iconUrl),
     title: p.title,
     description: p.description,
     order: p.order,
@@ -139,7 +139,7 @@ function toVehicleDTO(v: VehicleRow): VehicleDTO {
     typeTag: v.typeTag || `${v.category.name} · ${v.trimLabel}`,
     order: v.order,
     featureIcons: v.featureIcons.map((f) =>
-      iconRef(f.hotspotIcon.assetName, f.hotspotIcon.svgPath),
+      iconRef(f.hotspotIcon.assetName, f.hotspotIcon.svgPath, f.hotspotIcon.iconUrl),
     ),
     cardImageUrl: v.cardImageUrl ?? undefined,
     ownBackgroundUrl: v.ownBackgroundUrl ?? FALLBACK_OWN_BACKGROUND,
@@ -157,7 +157,11 @@ function toVehicleDTO(v: VehicleRow): VehicleDTO {
  * existe (fidelidad pixel — son los archivos de recursos/Iconos), o un
  * data-URI dibujado desde el path del catálogo como respaldo. iconAssetUrl
  * (mock-data) pasa ambos formatos tal cual. */
-function iconRef(assetName: string | null, svgPath: string): string {
+function iconRef(assetName: string | null, svgPath: string, iconUrl?: string | null): string {
+  // Un SVG subido desde /admin/iconos gana al archivo del repo: es lo que
+  // permite reemplazar el dibujo de un ícono del seed sin tocar /public.
+  // iconAssetUrl lo deja pasar tal cual por empezar con "/".
+  if (iconUrl) return iconUrl;
   if (assetName) return assetName;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#111318" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${svgPath}"/></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;

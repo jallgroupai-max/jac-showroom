@@ -18,6 +18,7 @@ export type FeatureIconOption = {
   label: string;
   svgPath: string;
   assetName: string | null;
+  iconUrl: string | null;
 };
 
 export type ExteriorPoi = {
