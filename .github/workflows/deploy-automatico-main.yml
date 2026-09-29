@@ -1,0 +1,23 @@
+name: Depliegue Automatico showroom
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY_DEPLOY }}
+
+      - name: Deploy showroom
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+              "bash -l ${{ secrets.DIRECCION }}/deploy-showroom-qa.sh 2>&1"
