@@ -65,8 +65,9 @@ interface SpriteViewerProps {
    * Cualquier gesto manual de rotación lo cancela. */
   targetFrame?: number;
   /** Encuadre guardado del 360° exterior por preset de pantalla (panel).
-   * Solo aplica en mobile/tablet vertical; sin fila para el preset del
-   * dispositivo (o sin esta prop) = encuadre por defecto de siempre. */
+   * Mobile/tablet vertical: el preset que elige useViewerPreset. Escritorio:
+   * el de ancho más cercano, resuelto por media queries. Sin fila para el
+   * preset del dispositivo (o sin esta prop) = encuadre por defecto de siempre. */
   viewerPositions?: ViewerPositions;
 }
 
@@ -136,13 +137,14 @@ export function SpriteViewer({
   // sin sets no hay nada que rotar — silueta compartida + aviso.
   const unavailable = spriteSets.length === 0;
 
-  // Encuadre mobile: el de ESTE preset de pantalla o, si no hay fila, el
-  // default del código (nunca el de otro preset). La silueta de "no
-  // disponible" conserva siempre el default.
+  // Encuadre: el de ESTE preset de pantalla o, si no hay fila, el default del
+  // código (nunca el de otro preset). Mobile lo elige el hook; escritorio va
+  // por media queries dentro de viewerLayerProps. La silueta de "no
+  // disponible" conserva siempre los defaults.
   const preset = useViewerPreset();
-  const position =
+  const mobilePosition =
     (!unavailable && preset ? viewerPositions?.[preset] : undefined) ?? DEFAULT_VIEWER_POSITION;
-  const layer = viewerLayerProps(position);
+  const layer = viewerLayerProps(mobilePosition, unavailable ? undefined : viewerPositions);
 
   // El frame arranca en 1: el primer cambio (por drag, botones o teclado)
   // cuenta como "el usuario ya rotó" y se notifica una única vez.
@@ -293,11 +295,10 @@ export function SpriteViewer({
             aparece — el fondo de escena NO participa del fade, solo el
             vehículo (o la silueta de "no disponible").
             Línea de piso: en mobile el vehículo se apoya casi en el borde
-            inferior del héroe (default 3%, configurable por vehículo y
-            preset desde el panel — ver viewer-position.ts); en desktop
-            queda un 10% por encima (lg:bottom-[10%]) para no pegarse a los
-            controles flotantes de abajo (a la par del fondo en
-            scene-background.tsx). */}
+            inferior del héroe (default 3%); en desktop queda un 10% por
+            encima para no pegarse a los controles flotantes de abajo (a la
+            par del fondo en scene-background.tsx). Ambos configurables por
+            vehículo y preset desde el panel — ver viewer-position.ts. */}
         <AnimatePresence initial={false}>
           <motion.div
             key={vehicleKey ?? "vehicle"}
@@ -313,7 +314,8 @@ export function SpriteViewer({
               pantallas angostas el frame ya toca el 100% del ancho y
               aumentar solo la altura no lo hacía más grande — el scale sí,
               a costa de un leve recorte lateral que el héroe
-              (overflow-hidden) absorbe. En desktop queda 1:1 sin transform.
+              (overflow-hidden) absorbe. En desktop, sin fila guardada, queda 1:1
+              sin transform.
               Va en un div PROPIO (no en las capas motion.img del barrido):
               framer-motion pisa el transform de los elementos que anima. */}
           <div

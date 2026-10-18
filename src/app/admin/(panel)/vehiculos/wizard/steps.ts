@@ -16,7 +16,7 @@ export const WIZARD_STEPS: WizardStep[] = [
   { num: 1, slug: "datos", title: "Datos y categoría", pendingPhase: null },
   { num: 2, slug: "ficha", title: "Ficha técnica", pendingPhase: null },
   { num: 3, slug: "galeria", title: "Galería 360° por color", pendingPhase: null },
-  { num: 4, slug: "posicion", title: "Posición en móvil", pendingPhase: null },
+  { num: 4, slug: "posicion", title: "Posición del vehículo", pendingPhase: null },
   { num: 5, slug: "destacados", title: "Destacados", pendingPhase: null },
   { num: 6, slug: "interior", title: "Interior y puntos de interés", pendingPhase: null },
   { num: 7, slug: "escenarios", title: "Escenarios de fondo", pendingPhase: null },
@@ -28,7 +28,7 @@ export type WizardCounts = {
   specGroups: number;
   colorsReady: number;
   colorsTotal: number;
-  /** Presets (de 4) con encuadre mobile guardado. */
+  /** Presets (de 7: 4 móvil + 3 PC) con encuadre guardado. */
   viewerPositions: number;
   poisExterior: number;
   hasInterior: boolean;

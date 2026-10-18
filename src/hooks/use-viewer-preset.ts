@@ -1,11 +1,13 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { pickViewerPreset, type ViewerPreset } from "@/lib/viewer-position";
+import { pickViewerPreset, type MobileViewerPreset } from "@/lib/viewer-position";
 
-// Preset de pantalla que le toca al dispositivo (ver pickViewerPreset). Solo
-// aplica bajo `lg` (< 1024px) y en vertical: en escritorio u horizontal
-// devuelve null y el visor conserva su comportamiento de siempre.
+// Preset MOBILE que le toca al dispositivo (ver pickViewerPreset). Solo aplica
+// bajo `lg` (< 1024px) y en vertical: en escritorio u horizontal devuelve null.
+// Los presets de ESCRITORIO no pasan por aquí: se resuelven con variables CSS +
+// media queries (viewerLayerProps), así el encuadre es correcto desde el primer
+// pintado, sin esperar a hidratar.
 //
 // useSyncExternalStore (patrón del repo para matchMedia, ver showroom-app):
 // sin efecto ni setState-en-efecto. El snapshot es un string primitivo, así
@@ -24,13 +26,13 @@ function subscribe(callback: () => void): () => void {
   };
 }
 
-function getSnapshot(): ViewerPreset | "" {
+function getSnapshot(): MobileViewerPreset | "" {
   if (window.matchMedia(DESKTOP_QUERY).matches) return "";
   if (!window.matchMedia(PORTRAIT_QUERY).matches) return "";
   return pickViewerPreset(window.innerWidth, window.innerHeight);
 }
 
-export function useViewerPreset(): ViewerPreset | null {
+export function useViewerPreset(): MobileViewerPreset | null {
   const preset = useSyncExternalStore(subscribe, getSnapshot, () => "" as const);
   return preset === "" ? null : preset;
 }

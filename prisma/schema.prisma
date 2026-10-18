@@ -260,19 +260,31 @@ model UploadJob {
 //   PHONE_STANDARD 390×664  ≈ 1.70  (iPhone 12–15, Android 360×640)
 //   PHONE_TALL     412×839  ≈ 2.04  (Android 20:9, Pixel 7)
 //   TABLET         820×1106 ≈ 1.35  (iPad 10ª gen; < lg = layout mobile)
+// Presets de ESCRITORIO (innerWidth ≥ 1024 = lg): se elige el de ANCHO más
+// cercano (no ratio). Viewport visible de referencia (CSS px, con barras):
+//   DESKTOP_LAPTOP 1366×625   (cubre 1280–1536)
+//   DESKTOP_FHD    1920×945
+//   DESKTOP_QHD    2560×1305
+// Los valores de escritorio se añadieron al final (ALTER TYPE ADD VALUE):
+// el orden del enum en Postgres es el de esta lista; no reordenar.
 enum ViewerDevicePreset {
   PHONE_SMALL
   PHONE_STANDARD
   PHONE_TALL
   TABLET
+  DESKTOP_LAPTOP
+  DESKTOP_FHD
+  DESKTOP_QHD
 }
 
 // Posición del vehículo en el visor 360° exterior, POR VEHÍCULO (no por
 // color: todos los colores comparten encuadre de cámara). Sin fila para un
-// preset = encuadre por defecto del código (sprite-viewer.tsx: bottom-[3%],
-// scale-[1.25] origin-bottom). Desktop (≥ lg) no lo usa. Valores ABSOLUTOS,
-// no deltas sobre el default: lo que el admin vio en la preview es lo que se
-// sirve aunque el default del código cambie. Rangos con CHECK en la migración.
+// preset = encuadre por defecto del código (sprite-viewer.tsx). Defaults:
+//   mobile/tablet (< lg): offsetX 0, offsetY 0.03 (bottom-[3%]),  scale 1.25
+//   desktop (≥ lg):       offsetX 0, offsetY 0.10 (lg:bottom-[10%]), scale 1.0
+// Valores ABSOLUTOS, no deltas sobre el default: lo que el admin vio en la
+// preview es lo que se sirve aunque el default del código cambie. Rangos con
+// CHECK en la migración (los mismos para mobile y desktop).
 model VehicleViewerPosition {
   vehicle   Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   vehicleId String
@@ -282,10 +294,10 @@ model VehicleViewerPosition {
   offsetX   Float
   // Línea de piso: distancia del borde inferior del héroe al apoyo del
   // vehículo, fracción del ALTO del héroe (= `bottom` en %): + = sube.
-  // Rango [-0.25, 0.5]. Default de código: 0.03 (bottom-[3%]).
+  // Rango [-0.25, 0.5]. Default de código: 0.03 mobile, 0.10 desktop.
   offsetY   Float
   // Multiplicador de tamaño, origen abajo-centro. Rango [0.5, 2.5].
-  // Default de código: 1.25 (scale-[1.25]).
+  // Default de código: 1.25 mobile (scale-[1.25]), 1.0 desktop.
   scale     Float
 
   @@id([vehicleId, preset])

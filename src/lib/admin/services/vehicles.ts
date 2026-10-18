@@ -246,7 +246,7 @@ export async function saveVehicleSpecs(
 }
 
 // ————————————————————————————————————————————————————————————————
-// Paso "Posición en móvil" — encuadre del 360° exterior por preset de
+// Paso "Posición del vehículo" — encuadre del 360° exterior por preset de
 // pantalla (VehicleViewerPosition). Cada preset del cuerpo es independiente:
 // objeto = upsert, null = restablecer a default (borra la fila), ausente =
 // no se toca. Rangos validados aquí además de los CHECK de la DB.

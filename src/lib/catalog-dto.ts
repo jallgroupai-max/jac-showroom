@@ -48,7 +48,7 @@ export interface VehicleDTO {
   pointsOfInterest: PointOfInterest[];
   /** Escenarios (del catálogo global) habilitados para ESTE vehículo. */
   scenarioIds: string[];
-  /** Encuadre del 360° exterior en mobile, por preset (solo los guardados). */
+  /** Encuadre del 360° exterior por preset, móvil y PC (solo los guardados). */
   viewerPositions: ViewerPositions;
 }
 

@@ -137,8 +137,8 @@ export interface Vehicle {
   specGroups: SpecGroup[];
   warrantyLabel: string;
   pointsOfInterest: PointOfInterest[];
-  /** Encuadre del 360° exterior en mobile por preset de pantalla (panel,
-   * paso "Posición en móvil"). Sin entrada para un preset = encuadre por
+  /** Encuadre del 360° exterior por preset de pantalla, móvil y PC (panel,
+   * paso "Posición del vehículo"). Sin entrada para un preset = encuadre por
    * defecto; ausente (mock) = todo por defecto. */
   viewerPositions?: ViewerPositions;
 }

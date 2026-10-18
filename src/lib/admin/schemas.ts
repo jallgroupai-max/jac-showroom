@@ -44,7 +44,7 @@ export const vehicleSpecsSchema = z.object({
 export type SpecItemInput = z.infer<typeof specItemSchema>;
 export type VehicleSpecsInput = z.infer<typeof vehicleSpecsSchema>;
 
-// Paso "Posición en móvil": encuadre del 360° exterior por preset de pantalla.
+// Paso "Posición del vehículo": encuadre del 360° exterior por preset de pantalla.
 // Mismos rangos que los CHECK de VehicleViewerPosition (z.number() ya rechaza
 // NaN e Infinity). Valores ABSOLUTOS, no deltas sobre el default.
 const viewerRange = (limits: { min: number; max: number }, what: string) =>
