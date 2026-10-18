@@ -9,7 +9,7 @@ import "@photo-sphere-viewer/markers-plugin/index.css";
 import { saveInteriorPoi, deletePoi } from "@/lib/admin/api";
 import { HotspotIconImage } from "./catalog-icon";
 
-// Paso 5 — Imagen 360° del interior y puntos de interés (Req 6/7).
+// Paso 6 — Imagen 360° del interior y puntos de interés (Req 6/7).
 //
 // El editor usa EXACTAMENTE el mismo stack que el visor público
 // (interior-panorama.tsx): Photo Sphere Viewer + MarkersPlugin, con el mismo

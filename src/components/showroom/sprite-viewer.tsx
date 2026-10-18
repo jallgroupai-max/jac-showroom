@@ -8,6 +8,12 @@ import { UNAVAILABLE_VEHICLE_IMAGE } from "@/lib/mock-data";
 import { FRAME_COUNT, warmDecodedFrames } from "@/lib/sprite-cache";
 import { MAX_SCALE, useVehicleViewer } from "@/hooks/use-vehicle-viewer";
 import { useSpriteQuality } from "@/hooks/use-sprite-quality";
+import { useViewerPreset } from "@/hooks/use-viewer-preset";
+import {
+  DEFAULT_VIEWER_POSITION,
+  viewerLayerProps,
+  type ViewerPositions,
+} from "@/lib/viewer-position";
 import { SceneBackground } from "./scene-background";
 import { InteriorPanorama } from "./interior-panorama";
 import { cn } from "@/lib/utils";
@@ -58,6 +64,10 @@ interface SpriteViewerProps {
    * (showroom-app.tsx) — muestra el vehículo desde el ángulo relevante.
    * Cualquier gesto manual de rotación lo cancela. */
   targetFrame?: number;
+  /** Encuadre guardado del 360° exterior por preset de pantalla (panel).
+   * Solo aplica en mobile/tablet vertical; sin fila para el preset del
+   * dispositivo (o sin esta prop) = encuadre por defecto de siempre. */
+  viewerPositions?: ViewerPositions;
 }
 
 const ROTATE_STEP = 3; // frames por clic (~30°) en los botones manuales
@@ -90,6 +100,7 @@ export function SpriteViewer({
   showControls = true,
   onFirstRotate,
   targetFrame,
+  viewerPositions,
 }: SpriteViewerProps) {
   // Barrido de cambio de color en TRES fases: "preload" (esperar el frame
   // visible del set nuevo — nunca barrer hacia una imagen a medio bajar),
@@ -124,6 +135,14 @@ export function SpriteViewer({
   // Vehículo sin modelo 360° ({modelo}/{color}/{quality} inexistente):
   // sin sets no hay nada que rotar — silueta compartida + aviso.
   const unavailable = spriteSets.length === 0;
+
+  // Encuadre mobile: el de ESTE preset de pantalla o, si no hay fila, el
+  // default del código (nunca el de otro preset). La silueta de "no
+  // disponible" conserva siempre el default.
+  const preset = useViewerPreset();
+  const position =
+    (!unavailable && preset ? viewerPositions?.[preset] : undefined) ?? DEFAULT_VIEWER_POSITION;
+  const layer = viewerLayerProps(position);
 
   // El frame arranca en 1: el primer cambio (por drag, botones o teclado)
   // cuenta como "el usuario ya rotó" y se notifica una única vez.
@@ -274,7 +293,8 @@ export function SpriteViewer({
             aparece — el fondo de escena NO participa del fade, solo el
             vehículo (o la silueta de "no disponible").
             Línea de piso: en mobile el vehículo se apoya casi en el borde
-            inferior del héroe (bottom-[3%], pedido: bajarlo); en desktop
+            inferior del héroe (default 3%, configurable por vehículo y
+            preset desde el panel — ver viewer-position.ts); en desktop
             queda un 10% por encima (lg:bottom-[10%]) para no pegarse a los
             controles flotantes de abajo (a la par del fondo en
             scene-background.tsx). */}
@@ -285,16 +305,21 @@ export function SpriteViewer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="absolute inset-x-0 top-0 bottom-[3%] flex items-end justify-center lg:bottom-[10%]"
+            className={cn("absolute inset-x-0 top-0 flex items-end justify-center", layer.floor.className)}
+            style={layer.floor.style}
           >
           {/* En mobile el vehículo se AGRANDA con un scale (origen abajo,
-              apoyado en la línea de piso): en pantallas angostas el frame ya
-              toca el 100% del ancho y aumentar solo la altura no lo hacía
-              más grande — el scale sí, a costa de un leve recorte lateral
-              que el héroe (overflow-hidden) absorbe. En desktop queda 1:1.
+              apoyado en la línea de piso) y se desplaza en horizontal: en
+              pantallas angostas el frame ya toca el 100% del ancho y
+              aumentar solo la altura no lo hacía más grande — el scale sí,
+              a costa de un leve recorte lateral que el héroe
+              (overflow-hidden) absorbe. En desktop queda 1:1 sin transform.
               Va en un div PROPIO (no en las capas motion.img del barrido):
               framer-motion pisa el transform de los elementos que anima. */}
-          <div className="flex h-full w-full origin-bottom scale-[1.25] items-end justify-center lg:scale-100">
+          <div
+            className={cn("flex h-full w-full items-end justify-center", layer.inner.className)}
+            style={layer.inner.style}
+          >
           {unavailable ? (
             <div className="relative flex h-[70%] max-w-[100%] translate-y-[6%] items-center justify-center lg:h-full lg:max-w-[82%]">
               {/* eslint-disable-next-line @next/next/no-img-element -- silueta compartida servida directo */}
@@ -359,7 +384,7 @@ export function SpriteViewer({
               // re-decodificar la imagen en cada frame, y ese lag hacía que
               // el 360 se sintiera pegado y luego saltara varios frames de
               // golpe al ponerse al día.
-              <div className="pointer-events-none relative h-[70%] max-w-[100%] drop-shadow-2xl lg:h-full lg:max-w-[82%]">
+              <div className={cn("pointer-events-none relative drop-shadow-2xl", layer.sprite.className)}>
                 {Array.from({ length: FRAME_COUNT }, (_, i) => i + 1).map((n) => (
                   // eslint-disable-next-line @next/next/no-img-element -- secuencia de frames servida directo, no encaja con next/image
                   <img

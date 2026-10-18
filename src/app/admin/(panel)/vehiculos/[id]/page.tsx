@@ -4,6 +4,7 @@ import { WizardShell } from "../wizard/wizard-shell";
 import { Step1Form } from "../wizard/step1-form";
 import { Step2SpecsForm } from "../wizard/step2-specs-form";
 import { Step3Gallery, type GalleryColor } from "../wizard/step3-gallery";
+import { Step4Position } from "../wizard/step4-position";
 import { Step4Features } from "../wizard/step4-features";
 import { Step5Interior } from "../wizard/step5-interior";
 import { Step6Scenarios } from "../wizard/step6-scenarios";
@@ -13,7 +14,7 @@ import { PublishBar } from "../wizard/publish-bar";
 import { getPublishBlockers } from "@/lib/admin/services/vehicles";
 
 // Edición por pasos de un vehículo existente. ?paso=N — los pasos de fases
-// futuras (3-6) caen al paso 1 hasta que su fase los habilite.
+// futuras caen al paso 1 hasta que su fase los habilite.
 export default async function EditarVehiculoPage({
   params,
   searchParams,
@@ -42,12 +43,24 @@ export default async function EditarVehiculoPage({
         blockers={blockers}
       />
       <WizardShell vehicleId={vehicle.id} activeStep={step} counts={counts}>
-      {step === 6 ? (
+      {step === 7 ? (
         <Step6ScenariosLoader vehicle={vehicle} />
-      ) : step === 4 ? (
-        <Step4FeaturesLoader vehicle={vehicle} />
-      ) : step === 5 ? (
+      ) : step === 6 ? (
         <Step5InteriorLoader vehicle={vehicle} />
+      ) : step === 5 ? (
+        <Step4FeaturesLoader vehicle={vehicle} />
+      ) : step === 4 ? (
+        <Step4Position
+          vehicleId={vehicle.id}
+          spriteBase={vehicle.colors.find((c) => c.spriteBasePath !== null)?.spriteBasePath ?? null}
+          hasPois={vehicle.pointsOfInterest.some((p) => p.mode === "EXTERIOR")}
+          saved={Object.fromEntries(
+            vehicle.viewerPositions.map((p) => [
+              p.preset,
+              { offsetX: p.offsetX, offsetY: p.offsetY, scale: p.scale },
+            ]),
+          )}
+        />
       ) : step === 3 ? (
         <Step3Gallery
           vehicleId={vehicle.id}
@@ -93,7 +106,7 @@ export default async function EditarVehiculoPage({
 
 type LoadedVehicle = NonNullable<Awaited<ReturnType<typeof getVehicleWithCounts>>>["vehicle"];
 
-// Paso 6: todo el catálogo global + el estado de habilitación de ESTE
+// Paso 7: todo el catálogo global + el estado de habilitación de ESTE
 // vehículo (VehicleScenario.enabled).
 async function Step6ScenariosLoader({ vehicle }: { vehicle: LoadedVehicle }) {
   const [allScenarios, joins] = await Promise.all([
@@ -116,7 +129,7 @@ async function Step6ScenariosLoader({ vehicle }: { vehicle: LoadedVehicle }) {
   );
 }
 
-// Paso 4: destacados = puntos de EXTERIOR (una sola entidad, plan §1.5).
+// Paso 5: destacados = puntos de EXTERIOR (una sola entidad, plan §1.5).
 // La vista previa del fotograma usa el sprite LOW del primer color procesado.
 async function Step4FeaturesLoader({ vehicle }: { vehicle: LoadedVehicle }) {
   const { icons } = await getWizardFormData();

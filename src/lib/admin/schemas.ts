@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VIEWER_LIMITS, VIEWER_PRESETS } from "@/lib/viewer-position";
 
 // Esquemas compartidos cliente (react-hook-form) / servidor (server actions).
 // La validación del servidor es la que manda — la del cliente solo acorta el
@@ -42,3 +43,27 @@ export const vehicleSpecsSchema = z.object({
 
 export type SpecItemInput = z.infer<typeof specItemSchema>;
 export type VehicleSpecsInput = z.infer<typeof vehicleSpecsSchema>;
+
+// Paso "Posición en móvil": encuadre del 360° exterior por preset de pantalla.
+// Mismos rangos que los CHECK de VehicleViewerPosition (z.number() ya rechaza
+// NaN e Infinity). Valores ABSOLUTOS, no deltas sobre el default.
+const viewerRange = (limits: { min: number; max: number }, what: string) =>
+  z
+    .number({ error: `${what} debe ser un número.` })
+    .min(limits.min, `${what} debe estar entre ${limits.min} y ${limits.max}.`)
+    .max(limits.max, `${what} debe estar entre ${limits.min} y ${limits.max}.`);
+
+export const viewerPositionSchema = z.object({
+  offsetX: viewerRange(VIEWER_LIMITS.offsetX, "La posición horizontal"),
+  offsetY: viewerRange(VIEWER_LIMITS.offsetY, "La posición vertical"),
+  scale: viewerRange(VIEWER_LIMITS.scale, "El tamaño"),
+});
+
+// Por preset: objeto = guardar (upsert); null = restablecer a default (borra
+// la fila); ausente = no tocar.
+export const vehicleViewerPositionsSchema = z.partialRecord(
+  z.enum(VIEWER_PRESETS),
+  viewerPositionSchema.nullable(),
+);
+
+export type VehicleViewerPositionsInput = z.infer<typeof vehicleViewerPositionsSchema>;

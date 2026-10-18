@@ -3,6 +3,8 @@
 // se sirve desde src/lib/mock-data.ts (ver docs/IMPLEMENTATION-PLAN.md §5,
 // "funcional primero, integrar después").
 
+import type { ViewerPositions } from "./viewer-position";
+
 export type ViewMode = "exterior" | "interior";
 
 export type Quality = "low" | "medium" | "high";
@@ -135,6 +137,10 @@ export interface Vehicle {
   specGroups: SpecGroup[];
   warrantyLabel: string;
   pointsOfInterest: PointOfInterest[];
+  /** Encuadre del 360° exterior en mobile por preset de pantalla (panel,
+   * paso "Posición en móvil"). Sin entrada para un preset = encuadre por
+   * defecto; ausente (mock) = todo por defecto. */
+  viewerPositions?: ViewerPositions;
 }
 
 export type ContactChannel = "whatsapp" | "call" | "email";

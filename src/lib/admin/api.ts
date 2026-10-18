@@ -1,6 +1,6 @@
 "use client";
 
-import type { ActionResult, JsonFile } from "./api-types";
+import type { ActionResult, JsonFile, ViewerPositionsPatch } from "./api-types";
 
 // Cliente del panel: cada función refleja 1:1 la Server Action que sustituye
 // (mismo nombre, misma firma, mismo ActionResult) para que los componentes
@@ -183,6 +183,13 @@ export function removeVehicleCardImage(vehicleId: string): Promise<ActionResult>
 
 export function saveVehicleSpecs(vehicleId: string, specs: unknown): Promise<ActionResult> {
   return post("/api/admin/vehicles/specs", { vehicleId, specs });
+}
+
+export function saveVehicleViewerPositions(
+  vehicleId: string,
+  positions: ViewerPositionsPatch,
+): Promise<ActionResult> {
+  return post("/api/admin/vehicles/viewer-positions", { vehicleId, positions });
 }
 
 export function setVehicleStatus(vehicleId: string, action: StatusAction): Promise<ActionResult> {

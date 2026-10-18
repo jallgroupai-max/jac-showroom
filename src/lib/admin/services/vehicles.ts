@@ -4,7 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/admin/audit";
 import { saveUpload, deleteUpload } from "@/lib/storage";
 import { decodeJsonFile } from "@/lib/admin/json-file";
-import { vehicleBasicsSchema, vehicleSpecsSchema } from "@/lib/admin/schemas";
+import {
+  vehicleBasicsSchema,
+  vehicleSpecsSchema,
+  vehicleViewerPositionsSchema,
+} from "@/lib/admin/schemas";
+import { VIEWER_PRESETS } from "@/lib/viewer-position";
 import type { ActionResult } from "@/lib/admin/api-types";
 import type { AdminUser } from "@prisma/client";
 
@@ -117,7 +122,7 @@ export async function updateVehicleBasics(
 // Paso 1 — foto de perfil del vehículo: la imagen del carrusel "selecciona
 // tu vehículo" del showroom público, y la miniatura de la biblioteca de
 // vehículos del admin (Vehicle.cardImageUrl). Requiere un vehículo ya
-// creado — igual que el fondo propio del paso 6.
+// creado — igual que el fondo propio del paso 7.
 // ————————————————————————————————————————————————————————————————
 
 export async function saveVehicleCardImage(
@@ -241,6 +246,63 @@ export async function saveVehicleSpecs(
 }
 
 // ————————————————————————————————————————————————————————————————
+// Paso "Posición en móvil" — encuadre del 360° exterior por preset de
+// pantalla (VehicleViewerPosition). Cada preset del cuerpo es independiente:
+// objeto = upsert, null = restablecer a default (borra la fila), ausente =
+// no se toca. Rangos validados aquí además de los CHECK de la DB.
+// ————————————————————————————————————————————————————————————————
+
+export async function saveVehicleViewerPositions(
+  user: AdminUser,
+  vehicleId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  const parsed = vehicleViewerPositionsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+  const entries = VIEWER_PRESETS.flatMap((preset) => {
+    const position = parsed.data[preset];
+    return position === undefined ? [] : [{ preset, position }];
+  });
+  if (entries.length === 0) return { ok: false, error: "No hay cambios que guardar." };
+
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+  if (!vehicle || vehicle.status === "ARCHIVED") return { ok: false, error: "El vehículo no existe." };
+
+  await prisma.$transaction(async (tx) => {
+    for (const { preset, position } of entries) {
+      if (position === null) {
+        await tx.vehicleViewerPosition.deleteMany({ where: { vehicleId, preset } });
+      } else {
+        await tx.vehicleViewerPosition.upsert({
+          where: { vehicleId_preset: { vehicleId, preset } },
+          create: { vehicleId, preset, ...position },
+          update: position,
+        });
+      }
+    }
+    await writeAudit(tx, {
+      userId: user.id,
+      action: "update-viewer-positions",
+      entityType: "Vehicle",
+      entityId: vehicleId,
+      detail: {
+        saved: entries.filter((e) => e.position !== null).map((e) => e.preset),
+        reset: entries.filter((e) => e.position === null).map((e) => e.preset),
+      },
+    });
+  });
+
+  revalidatePath(`/admin/vehiculos/${vehicleId}`);
+  // El showroom es force-dynamic; se revalida igual (mismo criterio que
+  // setVehicleStatus) por si eso cambia o ante el router cache del cliente.
+  revalidatePath("/");
+  revalidatePath(`/${vehicle.slug}`);
+  return { ok: true, id: vehicleId };
+}
+
+// ————————————————————————————————————————————————————————————————
 // Transiciones de estado (plan §1.8). Publicar DRAFT→PUBLISHED llega en A5
 // con sus guardas (galería completa, specs, slug) — aquí solo lo reversible.
 // ————————————————————————————————————————————————————————————————
@@ -310,11 +372,10 @@ export async function setVehicleStatus(
 // ————————————————————————————————————————————————————————————————
 
 export async function getPublishBlockers(vehicleId: string): Promise<string[]> {
+  // Galería 360°, interior, fotos de puntos de interés y ficha técnica son
+  // opcionales: el showroom deshabilita lo que no tenga contenido.
   const [vehicle, activeJobs] = await Promise.all([
-    prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-      include: { colors: true, specGroups: true },
-    }),
+    prisma.vehicle.findUnique({ where: { id: vehicleId }, select: { id: true } }),
     prisma.uploadJob.count({
       where: { vehicleId, status: { in: ["QUEUED", "EXTRACTING", "COMPRESSING"] } },
     }),
@@ -322,21 +383,8 @@ export async function getPublishBlockers(vehicleId: string): Promise<string[]> {
   if (!vehicle) return ["El vehículo no existe."];
 
   const blockers: string[] = [];
-  if (vehicle.colors.length === 0) {
-    blockers.push("Sin galería 360°: carga al menos un color (paso 3).");
-  } else {
-    const pending = vehicle.colors.filter((c) => c.spriteBasePath === null);
-    if (pending.length > 0) {
-      blockers.push(
-        `${pending.length === 1 ? "El color" : "Los colores"} ${pending.map((c) => c.colorName).join(", ")} aún no ${pending.length === 1 ? "tiene" : "tienen"} galería procesada (paso 3).`,
-      );
-    }
-  }
   if (activeJobs > 0) {
     blockers.push("Hay archivos procesándose — espera a que terminen.");
-  }
-  if (vehicle.specGroups.length === 0) {
-    blockers.push("Sin ficha técnica: añade al menos un grupo de especificaciones (paso 2).");
   }
   return blockers;
 }
@@ -386,7 +434,7 @@ export async function getPreviewUrl(vehicleId: string): Promise<ActionResult & {
 }
 
 // ————————————————————————————————————————————————————————————————
-// Paso 6 — Escenarios por vehículo (Req 8) y fondo propio (TRD §4.5).
+// Paso 7 — Escenarios por vehículo (Req 8) y fondo propio (TRD §4.5).
 // ————————————————————————————————————————————————————————————————
 
 export async function toggleVehicleScenario(

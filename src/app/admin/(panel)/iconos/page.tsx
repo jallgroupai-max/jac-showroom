@@ -7,17 +7,17 @@ import { DeleteIconButton } from "./delete-icon-button";
 // Catálogo de íconos — un catálogo, dos usos (plan §1.2): los chips de
 // combustible/tracción de la card (grupo GENERAL) y el marcador de los puntos
 // de interés de exterior e interior. Se lista por grupo porque es así como lo
-// consume el wizard: el paso 1 ve solo GENERAL, el 4 EXTERIOR y el 5 INTERIOR.
+// consume el wizard: el paso 1 ve solo GENERAL, el 5 EXTERIOR y el 6 INTERIOR.
 const GROUPS = [
   {
     key: "EXTERIOR" as const,
     title: "Exterior",
-    hint: "Puntos de interés sobre el vehículo en vista 360° (paso 4)",
+    hint: "Puntos de interés sobre el vehículo en vista 360° (paso 5)",
   },
   {
     key: "INTERIOR" as const,
     title: "Interior",
-    hint: "Marcadores sobre la panorámica del interior (paso 5)",
+    hint: "Marcadores sobre la panorámica del interior (paso 6)",
   },
   {
     key: "GENERAL" as const,

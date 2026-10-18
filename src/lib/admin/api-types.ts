@@ -1,3 +1,5 @@
+import type { ViewerPosition, ViewerPreset } from "@/lib/viewer-position";
+
 // Contrato compartido cliente/servidor del panel. Solo tipos — este módulo no
 // tiene runtime, así que lo importan por igual los Route Handlers y el cliente
 // (src/lib/admin/api.ts) sin arrastrar Prisma al bundle del navegador.
@@ -15,3 +17,8 @@ export type JsonFile = {
   /** Contenido en base64, SIN el prefijo `data:<mime>;base64,`. */
   data: string;
 };
+
+/** Cuerpo de POST /api/admin/vehicles/viewer-positions (campo `positions`),
+ * por preset: objeto = guardar (upsert), null = restablecer a default (borra
+ * la fila), ausente = no tocar. */
+export type ViewerPositionsPatch = Partial<Record<ViewerPreset, ViewerPosition | null>>;

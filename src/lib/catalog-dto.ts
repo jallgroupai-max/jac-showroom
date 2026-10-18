@@ -10,6 +10,7 @@ import type {
 } from "./types";
 import { QUALITIES } from "./types";
 import * as mock from "./mock-data";
+import type { ViewerPositions } from "./viewer-position";
 
 // Contrato serializable entre el servidor (Prisma) y el cliente (visor) —
 // plan §1.6: SpriteSet.frameUrl es una FUNCIÓN y no puede cruzar la frontera
@@ -47,6 +48,8 @@ export interface VehicleDTO {
   pointsOfInterest: PointOfInterest[];
   /** Escenarios (del catálogo global) habilitados para ESTE vehículo. */
   scenarioIds: string[];
+  /** Encuadre del 360° exterior en mobile, por preset (solo los guardados). */
+  viewerPositions: ViewerPositions;
 }
 
 export interface CatalogDTO {
@@ -98,6 +101,7 @@ export function hydrateVehicle(dto: VehicleDTO): Vehicle {
     specGroups: dto.specGroups,
     warrantyLabel: dto.warrantyLabel,
     pointsOfInterest: dto.pointsOfInterest,
+    viewerPositions: dto.viewerPositions,
   };
 }
 
@@ -170,6 +174,7 @@ export function mockCatalogDTO(): CatalogDTO {
       // En el mock todos los fondos personalizados están disponibles para
       // todos los vehículos — mismo comportamiento que tenía la app.
       scenarioIds: mock.CUSTOM_SCENES.map((s) => s.id),
+      viewerPositions: {},
     })),
   };
 }

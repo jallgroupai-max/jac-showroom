@@ -47,6 +47,7 @@ export async function getVehicleWithCounts(vehicleId: string) {
       },
       pointsOfInterest: { orderBy: [{ mode: "asc" }, { order: "asc" }], include: { icon: true } },
       scenarios: { where: { enabled: true } },
+      viewerPositions: true,
     },
   });
   if (!vehicle) return null;
@@ -55,6 +56,7 @@ export async function getVehicleWithCounts(vehicleId: string) {
     specGroups: vehicle.specGroups.length,
     colorsReady: vehicle.colors.filter((c) => c.spriteBasePath !== null).length,
     colorsTotal: vehicle.colors.length,
+    viewerPositions: vehicle.viewerPositions.length,
     poisExterior: vehicle.pointsOfInterest.filter((p) => p.mode === "EXTERIOR").length,
     hasInterior: vehicle.interiorPanoramaUrl !== null,
     scenarios: vehicle.scenarios.length,

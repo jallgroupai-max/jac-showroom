@@ -9,8 +9,8 @@ import type { ActionResult } from "@/lib/admin/api-types";
 import type { AdminUser } from "@prisma/client";
 
 // Puntos de interés (Fase A3). Una sola tabla para destacado y punto (plan
-// §1.5): el paso 4 edita el CONTENIDO de los de exterior (ícono, título,
-// descripción, imagen, frame) y el paso 5 POSICIONA los de interior sobre la
+// §1.5): el paso 5 edita el CONTENIDO de los de exterior (ícono, título,
+// descripción, imagen, frame) y el paso 6 POSICIONA los de interior sobre la
 // panorámica (textureX/Y normalizados 0–1 + blink).
 
 const iconSizeSchema = z.coerce.number().int().min(50).max(200).default(100);
@@ -73,7 +73,7 @@ async function processPoiImage(
 }
 
 // ————————————————————————————————————————————————————————————————
-// Paso 4 — Destacados (exterior).
+// Paso 5 — Destacados (exterior).
 // ————————————————————————————————————————————————————————————————
 
 export async function saveExteriorPoi(
@@ -167,7 +167,7 @@ export async function saveExteriorPoi(
 }
 
 // ————————————————————————————————————————————————————————————————
-// Paso 5 — Puntos de interior (posición normalizada 0–1, plan §1.5).
+// Paso 6 — Puntos de interior (posición normalizada 0–1, plan §1.5).
 // ————————————————————————————————————————————————————————————————
 
 export async function saveInteriorPoi(

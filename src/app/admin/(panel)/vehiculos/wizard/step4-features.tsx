@@ -7,7 +7,7 @@ import { saveExteriorPoi, deletePoi } from "@/lib/admin/api";
 import { getCroppedImageBlob } from "@/lib/admin/crop-image";
 import { HotspotIconImage } from "./catalog-icon";
 
-// Paso 4 — Destacados del exterior (prototipo "Destacados" + artefacto Req 5),
+// Paso 5 — Destacados del exterior (prototipo "Destacados" + artefacto Req 5),
 // MÁS el campo que el prototipo no tenía: el fotograma (1–36) al que rota el
 // vehículo al abrir el punto — con vista previa REAL sobre el sprite LOW ya
 // procesado (§0.2: por esto el paso 3 va antes).

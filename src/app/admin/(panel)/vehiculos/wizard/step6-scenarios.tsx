@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toggleVehicleScenario, saveOwnBackground, removeOwnBackground } from "@/lib/admin/api";
 import { CreateScenarioModal } from "../../escenarios/create-scenario-modal";
 
-// Paso 6 — Escenarios de fondo (Req 8, prototipo "Escenarios de fondo"):
+// Paso 7 — Escenarios de fondo (Req 8, prototipo "Escenarios de fondo"):
 // checklist del catálogo global con toggle por vehículo, alta inline sin
 // salir del wizard (reutiliza el modal de la biblioteca), y el fondo PROPIO
 // del vehículo — default del selector de Escena del showroom (TRD §4.5).

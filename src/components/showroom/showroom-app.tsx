@@ -368,6 +368,7 @@ export function ShowroomApp({ initialVehicleSlug, catalog }: ShowroomAppProps) {
             showControls={subPhase === "visualizer"}
             onFirstRotate={() => setHasRotated(true)}
             targetFrame={activePoi?.frame}
+            viewerPositions={vehicle.viewerPositions}
           />
 
           {/* Botón de INGRESO flotando encima del carro — visible solo con
@@ -472,7 +473,8 @@ export function ShowroomApp({ initialVehicleSlug, catalog }: ShowroomAppProps) {
           <button
             type="button"
             onClick={() => setSpecsOpen(true)}
-            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-l-xl bg-[#111318] px-4 py-2 text-[10px] font-bold tracking-widest text-white [writing-mode:vertical-rl]"
+            disabled={vehicle.specGroups.length === 0}
+            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-l-xl bg-[#111318] px-4 py-2 text-[10px] font-bold tracking-widest text-white [writing-mode:vertical-rl] disabled:cursor-not-allowed disabled:opacity-40"
           >
             « ESPEC
           </button>

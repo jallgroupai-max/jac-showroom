@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { PointOfInterest, Scene, SpecGroup } from "@/lib/types";
 import type { CatalogDTO, VehicleDTO } from "@/lib/catalog-dto";
 import { UNAVAILABLE_VEHICLE_IMAGE } from "@/lib/mock-data";
+import type { ViewerPositions } from "@/lib/viewer-position";
 
 // Adapter Prisma → CatalogDTO (Fase A5) — la fila "CMS" de la Fase 4 del
 // plan público, hecha realidad: el showroom deja de leer mock-data.ts.
@@ -35,6 +36,7 @@ export async function getCatalogDTO(options?: { previewVehicleId?: string | null
         specGroups: { orderBy: { order: "asc" }, include: { items: { orderBy: { order: "asc" } } } },
         pointsOfInterest: { orderBy: { order: "asc" }, include: { icon: true } },
         scenarios: { where: { enabled: true } },
+        viewerPositions: true,
       },
     }),
     prisma.scenario.findMany({ orderBy: [{ order: "asc" }, { createdAt: "asc" }] }),
@@ -68,6 +70,7 @@ function loadOne() {
       specGroups: { include: { items: true } },
       pointsOfInterest: { include: { icon: true } },
       scenarios: { where: { enabled: true } },
+      viewerPositions: true,
     },
   });
 }
@@ -150,6 +153,9 @@ function toVehicleDTO(v: VehicleRow): VehicleDTO {
     warrantyLabel: v.warrantyLabel,
     pointsOfInterest,
     scenarioIds: v.scenarios.map((s) => s.scenarioId),
+    viewerPositions: Object.fromEntries(
+      v.viewerPositions.map((p) => [p.preset, { offsetX: p.offsetX, offsetY: p.offsetY, scale: p.scale }]),
+    ) as ViewerPositions,
   };
 }
 
