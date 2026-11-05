@@ -13,7 +13,7 @@ npm run dev                     # 2. web (showroom + panel) — http://localhost
 npm run worker                  # 3. worker de assets, en OTRA terminal
 ```
 
-El worker (`worker/index.mjs`) es un proceso Node aparte de Next que procesa en cola los ZIP de fotogramas 360° subidos en el paso 3 del wizard (extracción, validación y compresión con sharp) y ejecuta la purga diaria de vehículos archivados. **Si no está corriendo, las subidas de ZIP quedan "en cola" para siempre** — es el síntoma típico de haber olvidado la tercera terminal.
+El worker (`worker/index.mjs`) es un proceso Node aparte de Next que procesa en cola las tandas de imágenes (fotogramas 360°) subidas en el paso 3 del wizard (extracción, validación y compresión con sharp) y ejecuta la purga diaria de vehículos archivados. **Si no está corriendo, las subidas quedan "en cola" para siempre** — es el síntoma típico de haber olvidado la tercera terminal.
 
 Variables en `.env` (ver `.env.example`): `DATABASE_URL`, `AUTH_SECRET`, credenciales del seed (`SEED_ADMIN_*`). Seed inicial: `npm run db:migrate && npm run db:seed`.
 

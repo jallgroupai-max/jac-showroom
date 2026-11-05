@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // Paso 3 — Galería 360° por color (plan §2.3/§2.4, prototipo "Galería 360°"):
-// dropzone de ZIP, una fila por color con estado vivo del pipeline, y las dos
+// dropzone de imágenes (tanda de fotogramas), una fila por color con estado vivo del pipeline, y las dos
 // acciones de recuperación según el tipo de fallo: Reintentar (transitorio) o
-// Reemplazar archivo (validación).
+// Reemplazar imágenes (validación).
 
 type JobInfo = {
   id: string;
@@ -30,7 +30,7 @@ export type GalleryColor = {
 
 /** Subida local aún sin confirmar (el usuario está poniendo nombre/color). */
 type PendingUpload = {
-  file: File;
+  files: File[];
   colorName: string;
   colorHex: string;
   /** Si reemplaza un color existente (validación fallida), su id. */
@@ -57,10 +57,10 @@ export function Step3Gallery({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceForRef = useRef<string | null>(null);
 
-  // Un .zip a la vez: mientras uno se está transfiriendo no se puede elegir
-  // otro. No bloquea la COLA —encolar cinco colores es normal (§2.3)— solo la
-  // transferencia: dos subidas de 100MB+ en paralelo se reparten el mismo
-  // ancho de banda y ninguna acaba antes. En cuanto el archivo termina de
+  // Una tanda a la vez: mientras una se está transfiriendo no se puede elegir
+  // otra. No bloquea la COLA —encolar cinco colores es normal (§2.3)— solo la
+  // transferencia: dos tandas de 100MB+ en paralelo se reparten el mismo
+  // ancho de banda y ninguna acaba antes. En cuanto las imágenes terminan de
   // subir y el job queda encolado, la zona vuelve a habilitarse.
   const isUploading = pending !== null && pending.uploadPercent !== null;
 
@@ -91,14 +91,14 @@ export function Step3Gallery({
   }, [activeKey, router]);
 
   // — Selección de archivo (alta nueva o reemplazo).
-  const onFileChosen = useCallback((file: File, replaceColorId: string | null) => {
+  const onFilesChosen = useCallback((files: File[], replaceColorId: string | null) => {
     // Última barrera del cliente: cubre a la vez el input, el drag & drop y el
-    // botón "Reemplazar archivo", sin repetir la condición en cada uno.
-    if (isUploading) return;
+    // botón "Reemplazar imágenes", sin repetir la condición en cada uno.
+    if (isUploading || files.length === 0) return;
     const replaced = replaceColorId ? colors.find((c) => c.id === replaceColorId) : null;
     setPending({
-      file,
-      colorName: replaced?.colorName ?? guessColorName(file.name),
+      files: [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+      colorName: replaced?.colorName ?? guessColorName(files[0].name),
       colorHex: replaced?.colorHex ?? "#FFFFFF",
       replaceColorId,
       uploadPercent: null,
@@ -118,16 +118,26 @@ export function Step3Gallery({
     setPending((p) => (p ? { ...p, uploadPercent: 0, error: null } : p));
 
     try {
-      const key = await uploadWithProgress(pending.file, (percent) =>
-        setPending((p) => (p ? { ...p, uploadPercent: percent } : p)),
-      );
+      // De a una, en secuencia; el % es sobre el total de bytes de la tanda.
+      const total = pending.files.reduce((sum, f) => sum + f.size, 0) || 1;
+      let doneBytes = 0;
+      const uploaded: { name: string; key: string }[] = [];
+      for (const file of pending.files) {
+        const key = await uploadWithProgress(file, (loaded) =>
+          setPending((p) =>
+            p ? { ...p, uploadPercent: Math.round(((doneBytes + loaded) / total) * 100) } : p,
+          ),
+        );
+        doneBytes += file.size;
+        uploaded.push({ name: file.name, key });
+      }
       const res = await fetch(`/api/admin/vehicles/${vehicleId}/colors`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           colorName: pending.colorName.trim(),
           colorHex: pending.colorHex,
-          key,
+          files: uploaded,
           replaceColorId: pending.replaceColorId ?? undefined,
         }),
       });
@@ -198,8 +208,8 @@ export function Step3Gallery({
       <div>
         <h2 className="mb-1.5 text-[26px] font-bold tracking-[-0.025em]">Galería 360° por color</h2>
         <p className="text-sm text-[var(--adm-muted)]">
-          Un .zip por color, con 36 imágenes secuenciales nombradas 001–036 (10° por
-          fotograma). El servidor deriva las tres calidades — se procesa en segundo plano y
+          Una tanda de imágenes por color: 36 fotogramas secuenciales nombrados 001–036 (10°
+          por fotograma). Selecciónalas todas juntas. El servidor deriva las tres calidades — se procesa en segundo plano y
           puedes salir sin perder nada.
         </p>
       </div>
@@ -215,27 +225,26 @@ export function Step3Gallery({
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
-          const file = e.dataTransfer.files?.[0];
-          if (file) onFileChosen(file, null);
+          onFilesChosen(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/")), null);
         }}
       >
         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="1.4" strokeLinecap="round">
           <path d="M12 16V4m0 0L7 9m5-5 5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
         </svg>
-        <span className="text-[15px] font-semibold">Arrastra el .zip o haz clic para seleccionar</span>
+        <span className="text-[15px] font-semibold">Arrastra las imágenes o haz clic para seleccionar</span>
         <span className="text-[12.5px] text-[var(--adm-faint)]">
           {isUploading
-            ? "Hay una subida en curso — espera a que termine para subir otro .zip"
-            : "ZIP · 36 archivos .png o .jpg nombrados 001–036 · un solo color por archivo"}
+            ? "Hay una subida en curso — espera a que termine para subir otra tanda"
+            : "36 archivos .png o .jpg nombrados 001–036 · un solo color por tanda"}
         </span>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".zip,application/zip,application/x-zip-compressed"
+          accept="image/png,image/jpeg,image/webp"
+          multiple
           className="hidden"
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onFileChosen(file, replaceForRef.current);
+            onFilesChosen(Array.from(e.target.files ?? []), replaceForRef.current);
             replaceForRef.current = null;
             e.target.value = "";
           }}
@@ -247,10 +256,12 @@ export function Step3Gallery({
         <div className="flex flex-col gap-3.5 rounded-[14px] border border-black p-[18px]">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="truncate text-[13.5px] font-semibold">{pending.file.name}</div>
+              <div className="truncate text-[13.5px] font-semibold">
+                {pending.files.length} {pending.files.length === 1 ? "imagen" : "imágenes"}
+              </div>
               <div className="text-[11.5px] text-[var(--adm-fainter)]">
-                {formatBytes(pending.file.size)}
-                {pending.replaceColorId ? " · reemplaza el archivo anterior" : ""}
+                {formatBytes(pending.files.reduce((sum, f) => sum + f.size, 0))}
+                {pending.replaceColorId ? " · reemplaza las imágenes anteriores" : ""}
               </div>
             </div>
             {pending.uploadPercent === null ? (
@@ -421,7 +432,7 @@ export function Step3Gallery({
                         }}
                         className="h-8 cursor-pointer rounded-full bg-black px-3.5 text-xs font-semibold text-white hover:bg-[var(--adm-hover)] disabled:cursor-default disabled:opacity-40"
                       >
-                        Reemplazar archivo
+                        Reemplazar imágenes
                       </button>
                     </div>
                   </div>
@@ -476,12 +487,12 @@ function stateLabel(job: JobInfo): string {
 }
 
 /** PUT con XHR — fetch aún no expone progreso de subida. */
-function uploadWithProgress(file: File, onProgress: (percent: number) => void): Promise<string> {
+function uploadWithProgress(file: File, onProgress: (loadedBytes: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", `/api/admin/uploads?filename=${encodeURIComponent(file.name)}`);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      if (e.lengthComputable) onProgress(e.loaded);
     };
     xhr.onload = () => {
       try {
@@ -497,7 +508,7 @@ function uploadWithProgress(file: File, onProgress: (percent: number) => void): 
   });
 }
 
-/** "ELITE_SEDAN_BLANCO_360.zip" → sugerencia "Blanco". */
+/** "ELITE_SEDAN_BLANCO_001.png" → sugerencia "Blanco". */
 function guessColorName(fileName: string): string {
   const known = ["blanco", "negro", "gris", "rojo", "azul", "plata", "verde", "beige", "marron"];
   const lower = fileName.toLowerCase();

@@ -84,7 +84,11 @@ export async function DELETE(_request: NextRequest, ctx: { params: Promise<{ id:
 
   if (color.spriteBasePath) await deleteUploadDir(color.spriteBasePath);
   const lastJob = color.jobs[0];
-  if (lastJob?.sourceUrl) await deleteUpload(lastJob.sourceUrl);
+  // sourceUrl: lista JSON de imágenes (los jobs viejos de ZIP ya no existen en disco).
+  if (lastJob?.sourceUrl.startsWith("[")) {
+    const sources: { url: string }[] = JSON.parse(lastJob.sourceUrl);
+    await Promise.all(sources.map((f) => deleteUpload(f.url)));
+  }
 
   return NextResponse.json({ ok: true });
 }

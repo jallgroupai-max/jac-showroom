@@ -10,12 +10,16 @@ import { getBoss, QUEUE_COLOR_ZIP } from "@/lib/queue";
 const bodySchema = z.object({
   colorName: z.string().trim().min(1, "El color necesita un nombre").max(60),
   colorHex: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Color inválido (#RRGGBB)"),
-  key: z.string().startsWith("tmp/", "Clave de subida inválida"),
+  /** Fotogramas ya subidos: nombre original (trae el número) + clave temporal. */
+  files: z
+    .array(z.object({ name: z.string().max(200), key: z.string().startsWith("tmp/", "Clave de subida inválida") }))
+    .min(1, "Sube las imágenes del color")
+    .max(200),
   /** Presente al usar "Reemplazar archivo" sobre un color existente. */
   replaceColorId: z.string().optional(),
 });
 
-// Confirma la subida de un ZIP y encola su procesamiento (plan §2.3 pasos
+// Confirma la subida de las imágenes de un color y encola su procesamiento (plan §2.3 pasos
 // 2-3). Un solo job activo por color (Req 4) — respaldado además por el
 // índice único (vehicleId, colorSlug).
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -31,19 +35,21 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { colorName, colorHex, key, replaceColorId } = parsed.data;
+  const { colorName, colorHex, files, replaceColorId } = parsed.data;
 
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle || vehicle.status === "ARCHIVED") {
     return NextResponse.json({ error: "El vehículo no existe" }, { status: 404 });
   }
 
-  // El ZIP debe existir de verdad en el storage temporal.
-  if (!(await uploadExists(key))) {
-    return NextResponse.json(
-      { error: "La subida no se completó — vuelve a intentar con el archivo" },
-      { status: 400 },
-    );
+  // Las imágenes deben existir de verdad en el storage temporal.
+  for (const f of files) {
+    if (!(await uploadExists(f.key))) {
+      return NextResponse.json(
+        { error: "La subida no se completó — vuelve a intentar con las imágenes" },
+        { status: 400 },
+      );
+    }
   }
 
   const colorSlug = slugify(colorName);
@@ -66,8 +72,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     if (existing?.activeJobId) {
       const active = await tx.uploadJob.findUnique({ where: { id: existing.activeJobId } });
       if (active && ["QUEUED", "EXTRACTING", "COMPRESSING"].includes(active.status)) {
-        // Req 4: un .zip por color — nunca dos jobs activos sobre el mismo.
-        return { error: "Este color ya tiene un archivo procesándose — espera a que termine" as const };
+        // Req 4: un set de imágenes por color — nunca dos jobs activos sobre el mismo.
+        return { error: "Este color ya tiene imágenes procesándose — espera a que termine" as const };
       }
     }
 
@@ -89,7 +95,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const job = await tx.uploadJob.create({
       data: {
         type: "COLOR_ZIP",
-        sourceUrl: `/uploads/${key}`,
+        sourceUrl: JSON.stringify(files.map((f) => ({ name: f.name, url: `/uploads/${f.key}` }))),
         vehicleColorId: color.id,
         vehicleId,
         createdById: user.id,
