@@ -254,6 +254,9 @@ export function ShowroomApp({ initialVehicleSlug, catalog }: ShowroomAppProps) {
     if (!next) return;
     setActiveVehicleSlug(slug);
     setActiveVariantId(next.variants[0].id);
+    // La URL sigue al vehículo activo (/arena-pro) → compartible y recargable.
+    // Next sincroniza replaceState con el router; conserva ?preview=.
+    window.history.replaceState(null, "", `/${slug}${window.location.search}`);
     // El modo Exterior/Interior PERSISTE al cambiar de vehículo (confirmado
     // en conversación) — no se resetea acá. El punto de interés abierto SÍ
     // se cierra: quedaba corriendo el auto/panel de un vehículo distinto.
