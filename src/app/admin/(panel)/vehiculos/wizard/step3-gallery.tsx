@@ -225,22 +225,27 @@ export function Step3Gallery({
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
-          onFilesChosen(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/")), null);
+          onFilesChosen(
+            Array.from(e.dataTransfer.files).filter(
+              (f) => f.type.startsWith("image/") || f.name.toLowerCase().endsWith(".zip"),
+            ),
+            null,
+          );
         }}
       >
         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="1.4" strokeLinecap="round">
           <path d="M12 16V4m0 0L7 9m5-5 5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
         </svg>
-        <span className="text-[15px] font-semibold">Arrastra las imágenes o haz clic para seleccionar</span>
+        <span className="text-[15px] font-semibold">Arrastra las imágenes o un .zip, o haz clic para seleccionar</span>
         <span className="text-[12.5px] text-[var(--adm-faint)]">
           {isUploading
             ? "Hay una subida en curso — espera a que termine para subir otra tanda"
-            : "36 archivos .png o .jpg nombrados 001–036 · un solo color por tanda"}
+            : "36 archivos .png o .jpg nombrados 001–036 (sueltos o en un .zip) · un solo color por tanda"}
         </span>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/png,image/jpeg,image/webp,.zip,application/zip"
           multiple
           className="hidden"
           onChange={(e) => {
@@ -257,7 +262,7 @@ export function Step3Gallery({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="truncate text-[13.5px] font-semibold">
-                {pending.files.length} {pending.files.length === 1 ? "imagen" : "imágenes"}
+                {pending.files.length === 1 ? pending.files[0].name : `${pending.files.length} imágenes`}
               </div>
               <div className="text-[11.5px] text-[var(--adm-fainter)]">
                 {formatBytes(pending.files.reduce((sum, f) => sum + f.size, 0))}

@@ -7,6 +7,7 @@ import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import path from "node:path";
+import unzipper from "unzipper"; // CJS — sin named exports en ESM
 import sharp from "sharp";
 import {
   S3_MODE,
@@ -71,16 +72,51 @@ export async function processColorZip(prisma, uploadJobId) {
   const srcDir = path.join(workDir, "src");
   const outDir = path.join(workDir, "out");
   // sourceUrl: lista JSON [{ name, url }] — nombre original (trae el número de
-  // fotograma) + URL del archivo temporal ya subido.
+  // fotograma) + URL del archivo temporal ya subido. Puede traer un .zip.
   const sources = JSON.parse(job.sourceUrl);
+  // S3: copias locales de los .zip (unzipper solo lee de disco). FUERA de
+  // workDir a propósito: el safeRm(workDir) de más abajo no debe borrarlas.
+  const zipCopies = [];
 
   try {
     await setProgress("EXTRACTING", 2);
 
+    // — Un .zip se expande a sus entradas: unzipper lee el directorio central
+    //   y cada entrada se streamea a disco después — nunca el ZIP entero en
+    //   memoria (§2.5).
+    const candidates = []; // { name, url } | { name, entry }
+    for (const [i, src] of sources.entries()) {
+      if (!src.name.toLowerCase().endsWith(".zip")) {
+        candidates.push(src);
+        continue;
+      }
+      const zipPath = S3_MODE
+        ? path.join(UPLOADS_ROOT, "tmp", `job-${uploadJobId}-source-${i}.zip`)
+        : publicUrlToPath(src.url);
+      if (S3_MODE) {
+        zipCopies.push(zipPath);
+        const asset = await getObjectStream(src.url.slice("/uploads/".length));
+        if (!asset) throw new Error(`El ZIP ${src.url} ya no está disponible en el bucket.`);
+        await mkdir(path.dirname(zipPath), { recursive: true });
+        await pipeline(Readable.fromWeb(asset.stream), createWriteStream(zipPath));
+      }
+      let zip;
+      try {
+        zip = await unzipper.Open.file(zipPath);
+      } catch {
+        throw new ValidationError("El archivo no es un ZIP válido o está corrupto.");
+      }
+      for (const entry of zip.files) {
+        if (entry.type !== "File" || entry.path.includes("__MACOSX")) continue;
+        const base = path.basename(entry.path);
+        if (!base.startsWith(".")) candidates.push({ name: base, entry });
+      }
+    }
+
     // — Validar: exactamente 36 imágenes numeradas 1..36 (§2.3).
-    const frames = new Map(); // número → { url, ext }
+    const frames = new Map(); // número → { url | entry, ext }
     const duplicates = new Set();
-    for (const { name, url } of sources) {
+    for (const { name, ...src } of candidates) {
       const ext = path.extname(name).toLowerCase();
       if (!IMAGE_EXTENSIONS.has(ext)) continue;
       const match = name.match(/(\d+)\.[a-zA-Z]+$/);
@@ -88,7 +124,7 @@ export async function processColorZip(prisma, uploadJobId) {
       const num = Number(match[1]);
       if (num < 1 || num > FRAME_COUNT) continue;
       if (frames.has(num)) duplicates.add(num);
-      frames.set(num, { url, ext });
+      frames.set(num, { ...src, ext });
     }
 
     if (duplicates.size > 0) {
@@ -111,9 +147,11 @@ export async function processColorZip(prisma, uploadJobId) {
     await safeRm(workDir);
     await mkdir(srcDir, { recursive: true });
     let extracted = 0;
-    for (const [num, { url, ext }] of frames) {
+    for (const [num, { url, entry, ext }] of frames) {
       const dest = path.join(srcDir, `${String(num).padStart(4, "0")}${ext}`);
-      if (S3_MODE) {
+      if (entry) {
+        await pipeline(entry.stream(), createWriteStream(dest));
+      } else if (S3_MODE) {
         const asset = await getObjectStream(url.slice("/uploads/".length));
         if (!asset) throw new Error(`La imagen ${url} ya no está disponible en el bucket.`);
         await pipeline(Readable.fromWeb(asset.stream), createWriteStream(dest));
@@ -243,6 +281,9 @@ export async function processColorZip(prisma, uploadJobId) {
       }
     }
     throw error;
+  } finally {
+    // El .zip fuente sigue en el bucket para "Reintentar"; la copia local no.
+    await Promise.all(zipCopies.map((p) => safeRm(p).catch(() => {})));
   }
 }
 

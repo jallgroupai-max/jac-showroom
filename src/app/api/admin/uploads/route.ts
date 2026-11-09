@@ -6,8 +6,9 @@ import { rateLimit, clientIp } from "@/lib/rate-limit";
 // Recepción de imágenes sueltas (fotogramas de un color) — emulación local del
 // flujo presigned (plan §2.3): el body va en streaming directo a disco, nunca
 // a memoria (§2.5). Con S3/R2 esta ruta se sustituye por una que solo firma
-// la URL del bucket. La UI sube los fotogramas de a uno, en secuencia.
-const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp"];
+// la URL del bucket. La UI sube los fotogramas de a uno, en secuencia, o un
+// .zip con los 36 (el worker lo descomprime).
+const ALLOWED_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "zip"];
 
 export async function PUT(request: NextRequest) {
   try {
@@ -33,8 +34,8 @@ export async function PUT(request: NextRequest) {
 
   const fileName = request.nextUrl.searchParams.get("filename") ?? "";
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (!IMAGE_EXTENSIONS.includes(ext)) {
-    return NextResponse.json({ error: "Solo se aceptan imágenes .png, .jpg o .webp" }, { status: 415 });
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return NextResponse.json({ error: "Solo se aceptan imágenes .png, .jpg, .webp o un .zip" }, { status: 415 });
   }
 
   const key = newTmpUploadKey(ext);
