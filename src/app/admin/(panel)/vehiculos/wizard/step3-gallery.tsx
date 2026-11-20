@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { encodeFile } from "@/lib/admin/api";
 
 // Paso 3 — Galería 360° por color (plan §2.3/§2.4, prototipo "Galería 360°"):
 // dropzone de imágenes (tanda de fotogramas), una fila por color con estado vivo del pipeline, y las dos
@@ -491,13 +492,28 @@ function stateLabel(job: JobInfo): string {
   }
 }
 
+/** Base64 por trozos de 3MB (múltiplo de 3: ningún trozo lleva "=" en medio,
+ * así que se concatenan tal cual) para no armar un único string del tamaño del
+ * ZIP. Va en base64 porque el FortiWeb de jacvenezuela bloquea los bytes
+ * binarios de PNG/ZIP — ver src/lib/base64-stream.ts. */
+async function toBase64Blob(file: File): Promise<Blob> {
+  const CHUNK = 3 * 1024 * 1024;
+  const parts: string[] = [];
+  for (let offset = 0; offset < file.size; offset += CHUNK) {
+    parts.push((await encodeFile(file.slice(offset, offset + CHUNK), file.name)).data);
+  }
+  return new Blob(parts, { type: "text/plain" });
+}
+
 /** PUT con XHR — fetch aún no expone progreso de subida. */
-function uploadWithProgress(file: File, onProgress: (loadedBytes: number) => void): Promise<string> {
+async function uploadWithProgress(file: File, onProgress: (loadedBytes: number) => void): Promise<string> {
+  const body = await toBase64Blob(file);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("PUT", `/api/admin/uploads?filename=${encodeURIComponent(file.name)}`);
+    xhr.open("PUT", `/api/admin/uploads?filename=${encodeURIComponent(file.name)}&encoding=base64`);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(e.loaded);
+      // El body pesa ~4/3 del archivo; el % se sigue mostrando sobre el original.
+      if (e.lengthComputable) onProgress((e.loaded / e.total) * file.size);
     };
     xhr.onload = () => {
       try {
@@ -509,7 +525,7 @@ function uploadWithProgress(file: File, onProgress: (loadedBytes: number) => voi
       }
     };
     xhr.onerror = () => reject(new Error("Fallo de red durante la subida"));
-    xhr.send(file);
+    xhr.send(body);
   });
 }
 

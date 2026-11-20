@@ -40,7 +40,7 @@ async function post<T extends ActionResult>(path: string, payload: unknown): Pro
 
 /** Lee un File/Blob a base64 sin cargarlo por trozos a mano: FileReader
  * soporta archivos grandes, a diferencia de btoa(String.fromCharCode(...)). */
-function encodeFile(blob: Blob, name: string): Promise<JsonFile> {
+export function encodeFile(blob: Blob, name: string): Promise<JsonFile> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer el archivo"));

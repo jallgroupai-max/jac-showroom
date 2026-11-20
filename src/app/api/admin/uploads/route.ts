@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdminUser } from "@/lib/auth";
 import { newTmpUploadKey, saveUploadStream } from "@/lib/storage";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { base64DecodeStream } from "@/lib/base64-stream";
 
 // Recepción de imágenes sueltas (fotogramas de un color) — emulación local del
 // flujo presigned (plan §2.3): el body va en streaming directo a disco, nunca
@@ -38,7 +39,14 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Solo se aceptan imágenes .png, .jpg, .webp o un .zip" }, { status: 415 });
   }
 
+  // La UI manda encoding=base64 para pasar el WAF (ver base64-stream.ts). Sin
+  // el parámetro se acepta el binario tal cual (curl, pestañas viejas).
+  const body =
+    request.nextUrl.searchParams.get("encoding") === "base64"
+      ? request.body.pipeThrough(base64DecodeStream())
+      : request.body;
+
   const key = newTmpUploadKey(ext);
-  await saveUploadStream(key, request.body);
+  await saveUploadStream(key, body);
   return NextResponse.json({ key });
 }
