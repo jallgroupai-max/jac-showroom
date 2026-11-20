@@ -32,15 +32,14 @@ export type ExteriorPoi = {
   iconSize: number;
 };
 
-// Dos recortes DISTINTOS de la misma foto fuente (no la misma imagen a dos
-// resoluciones) — desktop vertical 9:16, mobile horizontal 16:9.
-const CROP_VARIANTS = [
-  { key: "desktop" as const, label: "Escritorio", aspect: 9 / 16 },
-  { key: "mobile" as const, label: "Mobile", aspect: 16 / 9 },
-];
+// Un solo recorte horizontal 16:9: el panel del showroom muestra la foto
+// horizontal en TODOS los viewports. Se guarda en ambos campos (imageUrl e
+// imageMobileUrl) para no tocar el servidor; los destacados viejos con
+// recorte 9:16 en imageUrl siguen mostrando su imageMobileUrl.
+const CROP_ASPECT = 16 / 9;
 
-type CropVariantState = { crop: Point; zoom: number; pixelArea: Area | null };
-const INITIAL_CROP_STATE: CropVariantState = { crop: { x: 0, y: 0 }, zoom: 1, pixelArea: null };
+type CropState = { crop: Point; zoom: number; pixelArea: Area | null };
+const INITIAL_CROP_STATE: CropState = { crop: { x: 0, y: 0 }, zoom: 1, pixelArea: null };
 
 export function Step4Features({
   vehicleId,
@@ -136,20 +135,11 @@ function FeatureCard({
   // Recortes confirmados — reemplazan a los guardados solo si el admin elige
   // una foto fuente nueva; si no toca la imagen, el submit no manda archivo
   // y el servidor conserva lo que ya había.
-  const [desktopPreview, setDesktopPreview] = useState<string | null>(poi?.imageUrl ?? null);
-  const [mobilePreview, setMobilePreview] = useState<string | null>(poi?.imageMobileUrl ?? null);
-  const [desktopBlob, setDesktopBlob] = useState<Blob | null>(null);
-  const [mobileBlob, setMobileBlob] = useState<Blob | null>(null);
+  const [preview, setPreview] = useState<string | null>(poi?.imageMobileUrl ?? poi?.imageUrl ?? null);
+  const [imageBlob, setImageBlob] = useState<Blob | null>(null);
 
-  // Flujo de recorte: una foto fuente, recortada dos veces (una por
-  // variante) antes de poder aplicarse — no son resoluciones derivadas la
-  // una de la otra.
   const [rawSrc, setRawSrc] = useState<string | null>(null);
-  const [activeVariant, setActiveVariant] = useState<"desktop" | "mobile">("desktop");
-  const [cropStates, setCropStates] = useState<Record<"desktop" | "mobile", CropVariantState>>({
-    desktop: INITIAL_CROP_STATE,
-    mobile: INITIAL_CROP_STATE,
-  });
+  const [cropState, setCropState] = useState<CropState>(INITIAL_CROP_STATE);
   const [cropError, setCropError] = useState<string | null>(null);
   const [applyingCrop, setApplyingCrop] = useState(false);
 
@@ -160,8 +150,10 @@ function FeatureCard({
     formData.set("frame", String(frame));
     formData.set("iconSize", String(iconSize));
     if (poi) formData.set("id", poi.id);
-    if (desktopBlob) formData.set("imageDesktop", desktopBlob, "desktop.webp");
-    if (mobileBlob) formData.set("imageMobile", mobileBlob, "mobile.webp");
+    if (imageBlob) {
+      formData.set("imageDesktop", imageBlob, "desktop.webp");
+      formData.set("imageMobile", imageBlob, "mobile.webp");
+    }
     startTransition(async () => {
       const result = await saveExteriorPoi(vehicleId, formData);
       if (!result.ok) {
@@ -169,8 +161,7 @@ function FeatureCard({
         return;
       }
       setSaved(true);
-      setDesktopBlob(null);
-      setMobileBlob(null);
+      setImageBlob(null);
       onDone();
       router.refresh();
     });
@@ -178,28 +169,21 @@ function FeatureCard({
 
   function startCrop(file: File) {
     setCropError(null);
-    setActiveVariant("desktop");
-    setCropStates({ desktop: INITIAL_CROP_STATE, mobile: INITIAL_CROP_STATE });
+    setCropState(INITIAL_CROP_STATE);
     setRawSrc(URL.createObjectURL(file));
   }
 
   async function applyCrop() {
-    const desktopArea = cropStates.desktop.pixelArea;
-    const mobileArea = cropStates.mobile.pixelArea;
-    if (!rawSrc || !desktopArea || !mobileArea) {
-      setCropError("Ajusta el recorte en ambas pestañas (Escritorio y Mobile) antes de aplicar.");
+    const area = cropState.pixelArea;
+    if (!rawSrc || !area) {
+      setCropError("Ajusta el recorte antes de aplicar.");
       return;
     }
     setApplyingCrop(true);
     try {
-      const [dBlob, mBlob] = await Promise.all([
-        getCroppedImageBlob(rawSrc, desktopArea),
-        getCroppedImageBlob(rawSrc, mobileArea),
-      ]);
-      setDesktopBlob(dBlob);
-      setMobileBlob(mBlob);
-      setDesktopPreview(URL.createObjectURL(dBlob));
-      setMobilePreview(URL.createObjectURL(mBlob));
+      const blob = await getCroppedImageBlob(rawSrc, area);
+      setImageBlob(blob);
+      setPreview(URL.createObjectURL(blob));
       setRawSrc(null);
     } catch {
       setCropError("No se pudo generar el recorte — probá de nuevo.");
@@ -226,26 +210,11 @@ function FeatureCard({
       action={submit}
       className="flex flex-col overflow-hidden rounded-[18px] border border-[var(--adm-line)]"
     >
-      {/* Imagen del panel de detalle — dos recortes (9:16 desktop, 16:9 mobile) */}
+      {/* Imagen del panel de detalle — un recorte horizontal 16:9 */}
       {rawSrc ? (
         <div className="flex flex-col gap-2.5 border-b border-[var(--adm-line)] bg-[var(--adm-surface-soft)] p-3">
           <div className="flex items-center justify-between">
-            <div className="flex gap-1.5">
-              {CROP_VARIANTS.map((v) => (
-                <button
-                  key={v.key}
-                  type="button"
-                  onClick={() => setActiveVariant(v.key)}
-                  className={`h-7 cursor-pointer rounded-full border px-3 text-[11px] font-semibold ${
-                    activeVariant === v.key
-                      ? "border-black bg-black text-white"
-                      : "border-[var(--adm-border-input)] bg-white hover:border-black"
-                  }`}
-                >
-                  {v.label} {cropStates[v.key].pixelArea ? "✓" : ""}
-                </button>
-              ))}
-            </div>
+            <span className="text-[11px] font-semibold">Recorte horizontal 16:9</span>
             <button
               type="button"
               onClick={() => setRawSrc(null)}
@@ -257,19 +226,13 @@ function FeatureCard({
           <div className="relative h-64 w-full overflow-hidden rounded-[12px] bg-black">
             <Cropper
               image={rawSrc}
-              crop={cropStates[activeVariant].crop}
-              zoom={cropStates[activeVariant].zoom}
-              aspect={CROP_VARIANTS.find((v) => v.key === activeVariant)!.aspect}
+              crop={cropState.crop}
+              zoom={cropState.zoom}
+              aspect={CROP_ASPECT}
               rotation={0}
-              onCropChange={(crop) =>
-                setCropStates((s) => ({ ...s, [activeVariant]: { ...s[activeVariant], crop } }))
-              }
-              onZoomChange={(zoom) =>
-                setCropStates((s) => ({ ...s, [activeVariant]: { ...s[activeVariant], zoom } }))
-              }
-              onCropComplete={(_area, pixelArea) =>
-                setCropStates((s) => ({ ...s, [activeVariant]: { ...s[activeVariant], pixelArea } }))
-              }
+              onCropChange={(crop) => setCropState((s) => ({ ...s, crop }))}
+              onZoomChange={(zoom) => setCropState((s) => ({ ...s, zoom }))}
+              onCropComplete={(_area, pixelArea) => setCropState((s) => ({ ...s, pixelArea }))}
             />
           </div>
           {cropError ? <p className="text-xs font-semibold text-[#b42318]">{cropError}</p> : null}
@@ -284,29 +247,21 @@ function FeatureCard({
         </div>
       ) : (
         <label className="relative flex aspect-video cursor-pointer items-center justify-center border-b border-[var(--adm-line)] bg-[var(--adm-surface)]">
-          {desktopPreview || mobilePreview ? (
-            <div className="flex h-full w-full">
-              {desktopPreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={desktopPreview} alt="" className="h-full w-1/2 object-cover" />
-              ) : null}
-              {mobilePreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={mobilePreview} alt="" className="h-full w-1/2 object-cover" />
-              ) : null}
-            </div>
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="flex flex-col items-center gap-2 text-[var(--adm-fainter)]">
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
                 <path d="M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6" />
               </svg>
-              <span className="text-xs tracking-[0.04em]">Añadir imagen (recorta desktop + mobile)</span>
+              <span className="text-xs tracking-[0.04em]">Añadir imagen (recorte horizontal 16:9)</span>
             </div>
           )}
           <span className="absolute left-3 top-3 rounded-full bg-black px-2.5 py-[5px] text-[11px] font-bold tracking-[0.08em] text-white">
             EXTERIOR
           </span>
-          {(desktopPreview || mobilePreview) && (
+          {preview && (
             <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-[5px] text-[11px] font-bold text-black">
               Reemplazar imagen
             </span>

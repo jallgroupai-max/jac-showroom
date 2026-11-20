@@ -9,11 +9,6 @@ import { cn } from "@/lib/utils";
 interface PoiDetailPanelProps {
   poi: PointOfInterest;
   onClose: () => void;
-  /** Mismo booleano que showroom-app.tsx ya calcula para el resto del hero
-   * (media query 1024px) — decide qué recorte de imagen usar: 9:16 desktop
-   * o 16:9 mobile. Ambos son recortes DISTINTOS de la misma foto, no una
-   * resolución derivada de la otra. */
-  isDesktop: boolean;
   /** Distancia en px desde el borde inferior del viewport hasta el borde
    * inferior de la card — SOLO desktop EXTERIOR. Calculado en
    * showroom-app.tsx como `window.innerHeight - toolbar.getBoundingClientRect().top + 20`,
@@ -51,7 +46,7 @@ const ANCHOR_MARGIN = 16;
  *   necesita el tamaño real de la card para centrarla y decidir el flip)
  *   en vez de asumir un ancho/alto fijo.
  */
-export function PoiDetailPanel({ poi, onClose, desktopBottomOffset, anchorRect, isDesktop }: PoiDetailPanelProps) {
+export function PoiDetailPanel({ poi, onClose, desktopBottomOffset, anchorRect }: PoiDetailPanelProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [anchoredPos, setAnchoredPos] = useState<{ left: number; top: number } | null>(null);
 
@@ -104,7 +99,7 @@ export function PoiDetailPanel({ poi, onClose, desktopBottomOffset, anchorRect, 
     >
       <div
         ref={cardRef}
-        className="relative flex h-full w-full flex-col overflow-x-hidden overflow-y-auto rounded-t-3xl bg-white text-left shadow-2xl lg:pointer-events-auto lg:h-auto lg:max-w-md lg:flex-row lg:rounded-3xl"
+        className="relative flex h-full w-full flex-col overflow-x-hidden overflow-y-auto rounded-t-3xl bg-white text-left shadow-2xl lg:pointer-events-auto lg:h-auto lg:max-w-md lg:rounded-3xl"
       >
         <button
           type="button"
@@ -119,13 +114,21 @@ export function PoiDetailPanel({ poi, onClose, desktopBottomOffset, anchorRect, 
         {poi.image && (
           // eslint-disable-next-line @next/next/no-img-element -- imagen suelta de recursos/Iconos
           <img
-            src={poiImageAssetUrl(isDesktop ? poi.image : (poi.imageMobile ?? poi.image))}
+            // Horizontal en TODOS los viewports (pedido explícito): el recorte
+            // 16:9 manda; `image` queda de fallback (puntos de interior, o
+            // destacados viejos sin recorte mobile). Caja 16:9 + contain: la
+            // foto se ve COMPLETA, sin recortar arriba/abajo (pedido
+            // explícito); aspect-video además reserva el alto antes de que
+            // cargue (el anclaje de interior mide la card al montar).
+            // max-h-[40vh]: en mobile horizontal la hoja es baja — ahí la
+            // foto se achica (contain) en vez de ocupar toda la hoja.
+            src={poiImageAssetUrl(poi.imageMobile ?? poi.image)}
             alt=""
             aria-hidden
-            className="h-36 w-full shrink-0 object-cover lg:h-auto lg:min-h-64 lg:w-[30%] lg:shrink"
+            className="aspect-video max-h-[40vh] w-full shrink-0 object-contain"
           />
         )}
-        <div className="shrink-0 p-5 lg:flex lg:w-[70%] lg:flex-col lg:justify-center lg:p-8">
+        <div className="shrink-0 p-5 lg:p-6">
           <p className="text-base font-bold text-[#12141A] lg:text-xl">{poi.title}</p>
           <p className="mt-1.5 text-sm leading-relaxed text-[#6B7280] lg:mt-3 lg:text-sm">{poi.description}</p>
         </div>
