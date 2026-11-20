@@ -7,6 +7,10 @@ on:
 
 jobs:
   deploy:
+    # Solo despliega el repo de Corporación BEL, que es el que tiene los
+    # secretos SSH. El mismo código se sube también a jallgroupai-max; ahí el
+    # job queda "skipped" en vez de fallar (y nunca hay doble deploy).
+    if: github.repository == 'Corporacion-bel/jac-vzla-showroom360'
     runs-on: ubuntu-latest
 
     steps:
