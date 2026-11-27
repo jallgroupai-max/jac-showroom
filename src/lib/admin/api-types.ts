@@ -22,3 +22,19 @@ export type JsonFile = {
  * por preset: objeto = guardar (upsert), null = restablecer a default (borra
  * la fila), ausente = no tocar. */
 export type ViewerPositionsPatch = Partial<Record<ViewerPreset, ViewerPosition | null>>;
+
+/** Resultado de POST /api/admin/vehicles/import (campos extra sobre ActionResult). */
+export type VehicleImportResult =
+  | {
+      ok: true;
+      /** id del vehículo creado (DRAFT). */
+      id: string;
+      slug: string;
+      /** Slug original del paquete cuando hubo que sufijarlo (-2, -3…). */
+      requestedSlug: string | null;
+      colorsQueued: number;
+      /** Escenarios del paquete que no existen en este entorno. */
+      skippedScenarios: string[];
+      warnings: string[];
+    }
+  | { ok: false; error: string };

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setVehicleStatus, moveVehicle } from "@/lib/admin/api";
+import { setVehicleStatus, moveVehicle, exportVehicleUrl } from "@/lib/admin/api";
 
 // Acciones de la card: pausar / republicar / archivar (con confirmación
 // inline — sin window.confirm) y orden con flechas. Permisos planos: todo
@@ -71,6 +71,10 @@ export function VehicleCardActions({
           Republicar
         </button>
       ) : null}
+      {/* Descarga directa (zip en streaming) — no pasa por fetch. */}
+      <a href={exportVehicleUrl(vehicleId)} download className={`${pill} inline-flex items-center text-black no-underline`}>
+        Exportar
+      </a>
       <button type="button" disabled={isPending} onClick={() => setConfirmingArchive(true)} className={pill}>
         Archivar
       </button>

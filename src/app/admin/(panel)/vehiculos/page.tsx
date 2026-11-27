@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { updatedAgo } from "@/lib/admin/time";
 import { CategoryIcon } from "./wizard/catalog-icon";
 import { VehicleCardActions } from "./vehicle-card-actions";
+import { ImportVehicle } from "./import-vehicle";
 
 // Biblioteca de vehículos — 1:1 con el prototipo ("Vehículos cargados"):
 // filtros por categoría en pills, búsqueda, grid de cards con badge de
@@ -90,6 +91,7 @@ export default async function VehiculosPage({
               className="w-[150px] border-none bg-transparent text-[13px] outline-none"
             />
           </form>
+          <ImportVehicle />
           <Link
             href="/admin/vehiculos/nuevo"
             className="flex h-[42px] items-center gap-2 rounded-full bg-black px-5 text-[13px] font-semibold text-white no-underline transition-colors hover:bg-[var(--adm-hover)]"

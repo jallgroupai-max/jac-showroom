@@ -4,13 +4,12 @@ import { requireAdminUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/admin/audit";
 import { saveUpload, deleteUpload } from "@/lib/storage";
+import { deriveInteriorPanorama } from "@/lib/admin/interior-panorama";
 
 // Panorámica de interior (plan §1.4 / artefacto Req 6): equirectangular 2:1
 // EXACTO — validado con sharp.metadata() ANTES de guardar nada; si no cumple,
 // 422 con mensaje accionable. La variante mobile (≤4096px, límite de textura
 // de GPU móvil) la genera el servidor — nunca se le pide al usuario.
-const MOBILE_MAX_WIDTH = 4096;
-const DESKTOP_MAX_WIDTH = 8192;
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   let user;
@@ -59,14 +58,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
   // Derivar y guardar: original (capada a 8192) + mobile (≤4096).
   const base = `interior/${vehicle.slug}`;
-  const desktop = await sharp(buffer)
-    .resize({ width: Math.min(width, DESKTOP_MAX_WIDTH) })
-    .webp({ quality: 80 })
-    .toBuffer();
-  const mobile = await sharp(buffer)
-    .resize({ width: Math.min(width, MOBILE_MAX_WIDTH) })
-    .webp({ quality: 78 })
-    .toBuffer();
+  const { desktop, mobile, desktopWidth, desktopHeight } = await deriveInteriorPanorama(buffer, width);
 
   // Nombres versionados por timestamp: reemplazar una panorámica no debe
   // servir la vieja desde caché del navegador.
@@ -81,8 +73,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       data: {
         interiorPanoramaUrl: desktopUrl,
         interiorPanoramaMobileUrl: mobileUrl,
-        interiorPanoramaWidth: Math.min(width, DESKTOP_MAX_WIDTH),
-        interiorPanoramaHeight: Math.min(width, DESKTOP_MAX_WIDTH) / 2,
+        interiorPanoramaWidth: desktopWidth,
+        interiorPanoramaHeight: desktopHeight,
       },
     });
     await writeAudit(tx, {
