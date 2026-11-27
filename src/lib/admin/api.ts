@@ -1,6 +1,6 @@
 "use client";
 
-import type { ActionResult, JsonFile, ViewerPositionsPatch } from "./api-types";
+import type { ActionResult, JsonFile, VehicleImportResult, ViewerPositionsPatch } from "./api-types";
 
 // Cliente del panel: cada función refleja 1:1 la Server Action que sustituye
 // (mismo nombre, misma firma, mismo ActionResult) para que los componentes
@@ -54,6 +54,19 @@ export function encodeFile(blob: Blob, name: string): Promise<JsonFile> {
     };
     reader.readAsDataURL(blob);
   });
+}
+
+/** Base64 por trozos de 3MB (múltiplo de 3: ningún trozo lleva "=" en medio,
+ * así que se concatenan tal cual) para no armar un único string del tamaño del
+ * archivo. Va en base64 porque el FortiWeb de jacvenezuela bloquea los bytes
+ * binarios de PNG/ZIP — ver src/lib/base64-stream.ts. */
+export async function toBase64Blob(file: Blob, name = "archivo"): Promise<Blob> {
+  const CHUNK = 3 * 1024 * 1024;
+  const parts: string[] = [];
+  for (let offset = 0; offset < file.size; offset += CHUNK) {
+    parts.push((await encodeFile(file.slice(offset, offset + CHUNK), name)).data);
+  }
+  return new Blob(parts, { type: "text/plain" });
 }
 
 /** Convierte un FormData en el objeto JSON equivalente — los archivos pasan a
@@ -247,4 +260,79 @@ export async function saveInteriorPoi(
 
 export function deletePoi(vehicleId: string, poiId: string): Promise<ActionResult> {
   return post("/api/admin/vehicles/poi/delete", { vehicleId, poiId });
+}
+
+// ————————————————————————————————————————————————————————————————
+// Exportar / importar un vehículo completo (.zip)
+// ————————————————————————————————————————————————————————————————
+
+/** Descarga directa (GET binario en streaming): basta un <a href download>. */
+export function exportVehicleUrl(vehicleId: string): string {
+  return `/api/admin/vehicles/${vehicleId}/export`;
+}
+
+// Partes de ≤ 45MB: en base64 son ~60MB, bajo el tope de 100MB por request de
+// Cloudflare (un vehículo completo lo supera con holgura). El servidor las
+// concatena en streaming a disco (src/lib/admin/vehicle-package/chunked-upload.ts).
+const IMPORT_PART_BYTES = 45 * 1024 * 1024;
+const PART_RETRIES = 2;
+
+function putPart(
+  uploadId: string,
+  part: number,
+  body: Blob,
+  onProgress: (fraction: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", `/api/admin/uploads?uploadId=${uploadId}&part=${part}&encoding=base64`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      let message = `Fallo al subir (${xhr.status}).`;
+      try {
+        message = JSON.parse(xhr.responseText).error ?? message;
+      } catch {
+        // respuesta no JSON (WAF/proxy): se queda el mensaje con el estado HTTP
+      }
+      reject(new Error(message));
+    };
+    xhr.onerror = () => reject(new Error("Fallo de red durante la subida."));
+    xhr.send(body);
+  });
+}
+
+/** Sube el .zip en partes (base64, ver toBase64Blob) y dispara la importación.
+ * `onProgress` recibe 0–100 de la SUBIDA; el POST final puede tardar unos
+ * segundos más (el servidor valida y escribe). */
+export async function importVehicle(
+  file: File,
+  onProgress: (percent: number) => void,
+): Promise<VehicleImportResult> {
+  const uploadId = crypto.randomUUID();
+  const parts = Math.max(1, Math.ceil(file.size / IMPORT_PART_BYTES));
+  try {
+    for (let part = 0; part < parts; part++) {
+      const slice = file.slice(part * IMPORT_PART_BYTES, (part + 1) * IMPORT_PART_BYTES);
+      const body = await toBase64Blob(slice, file.name);
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await putPart(uploadId, part, body, (fraction) =>
+            onProgress(Math.round(((part * IMPORT_PART_BYTES + fraction * slice.size) / file.size) * 100)),
+          );
+          break;
+        } catch (error) {
+          // Reintento solo ante fallo de red: la parte N se sobrescribe sin riesgo.
+          const network = error instanceof Error && error.message.startsWith("Fallo de red");
+          if (!network || attempt >= PART_RETRIES) throw error;
+        }
+      }
+    }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Fallo al subir el archivo." };
+  }
+  onProgress(100);
+  return post<VehicleImportResult>("/api/admin/vehicles/import", { uploadId, parts });
 }

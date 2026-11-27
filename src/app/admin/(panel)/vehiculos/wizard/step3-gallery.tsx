@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { encodeFile } from "@/lib/admin/api";
+import { toBase64Blob } from "@/lib/admin/api";
 
 // Paso 3 — Galería 360° por color (plan §2.3/§2.4, prototipo "Galería 360°"):
 // dropzone de imágenes (tanda de fotogramas), una fila por color con estado vivo del pipeline, y las dos
@@ -490,19 +490,6 @@ function stateLabel(job: JobInfo): string {
     default:
       return "";
   }
-}
-
-/** Base64 por trozos de 3MB (múltiplo de 3: ningún trozo lleva "=" en medio,
- * así que se concatenan tal cual) para no armar un único string del tamaño del
- * ZIP. Va en base64 porque el FortiWeb de jacvenezuela bloquea los bytes
- * binarios de PNG/ZIP — ver src/lib/base64-stream.ts. */
-async function toBase64Blob(file: File): Promise<Blob> {
-  const CHUNK = 3 * 1024 * 1024;
-  const parts: string[] = [];
-  for (let offset = 0; offset < file.size; offset += CHUNK) {
-    parts.push((await encodeFile(file.slice(offset, offset + CHUNK), file.name)).data);
-  }
-  return new Blob(parts, { type: "text/plain" });
 }
 
 /** PUT con XHR — fetch aún no expone progreso de subida. */
